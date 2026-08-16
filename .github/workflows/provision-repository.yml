@@ -1,0 +1,80 @@
+name: provision-repository
+description: Provisions a new GitHub repository on demand.
+
+on:
+  workflow_dispatch:
+    inputs:
+      request:
+        description: Provision repository request details
+        type: string
+        required: true
+
+      context:
+        description: Request context
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  request-handler:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      # STEP_0: Checkout code
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      # STEP_1: Cache project dependencies
+      - name: Cache Project Dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          # Changes the cache anytime your lockfile changes
+          key: ${{ runner.os }}-bun-deps-${{ hashFiles('**/bun.lockb', '**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-deps-
+
+      # STEP_2: Setup Bun with Caching
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # STEP_3: Pulls from ~/.bun/install/cache if available
+      - name: Install dependencies
+        run: bun install
+
+      # STEP_4: Generate temporary access token using github app
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.HUB_MASON_BOT_ID }}
+          private-key: ${{ secrets.HUB_MASON_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            hub-mason-portal
+            hub-mason-engine
+
+      # STEP_5: Verify request
+      - name: Validate request
+        id: request-validator
+        run: |
+          echo "TODO: Request Validator Check"
+
+      # STEP_6: Setup OpenTofu
+      - name: Setup OpenTofu
+        id: opentofu-setup
+        uses: opentofu/setup-opentofu@v2
+
+      - name: Verify OpenTofu
+        run: tofu version
+
+      # STEP_7:
+      - name: Provision Repository
+        run: |
+          echo "TODO: Provision Repository"
