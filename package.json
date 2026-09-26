@@ -1,6 +1,7 @@
 {
     "name": "hub-mason-engine",
-    "module": "index.ts",
+    "main": "src/app.ts",
+    "module": "src/app.ts",
     "type": "module",
     "private": true,
     "scripts": {
@@ -42,6 +43,7 @@
     "dependencies": {
         "@actions/github": "^9.1.1",
         "@github/issue-parser": "^2.0.0",
+        "hub-mason-core": "1.4.0",
         "lodash": "^4.18.1",
         "mdast-util-gfm-table": "^2.0.0",
         "mdast-util-to-markdown": "^2.1.2",
