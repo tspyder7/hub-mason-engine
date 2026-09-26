@@ -10,6 +10,11 @@ export default defineConfig({
         },
     },
     test: {
+        server: {
+            deps: {
+                inline: [/hub-mason-core/, /octokit/],
+            },
+        },
         setupFiles: ['./tests/fixtures/setup.ts'],
         globals: true,
         coverage: {

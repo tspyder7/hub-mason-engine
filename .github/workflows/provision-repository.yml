@@ -60,28 +60,16 @@ jobs:
             hub-mason-portal
             hub-mason-engine
 
-      # STEP_5: Verify request
-      - name: Validate request
-        id: request-validator
-        env:
-          HUB_MASON_WORKFLOW_SECRET_KEY: ${{ secrets.HUB_MASON_WORKFLOW_SECRET_KEY }}
-        run: |
-          echo "TODO: Request Validator Check"
-
-      # STEP_6: Setup OpenTofu
+      # STEP_5: Setup OpenTofu
       - name: Setup OpenTofu
-        id: opentofu-setup
         uses: opentofu/setup-opentofu@v2
 
       - name: Verify OpenTofu
         run: tofu version
 
-      # STEP_7:
+      # STEP_6: Provision Repository 
       - name: Provision Repository
         env:
-          PROVISION_REQUEST: ${{ inputs.request }}
-          PROVISION_CONTEXT: ${{ inputs.context }}
-        run: |
-          echo "TODO: Provision Repository"
-          echo "Request: $PROVISION_REQUEST"
-          echo "Context: $PROVISION_CONTEXT"
+          HUB_MASON_GITHUB_APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          HUB_MASON_WORKFLOW_SECRET_KEY: ${{ secrets.HUB_MASON_WORKFLOW_SECRET_KEY }}
+        run: bun run src/app.ts
