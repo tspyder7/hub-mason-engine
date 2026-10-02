@@ -2,6 +2,9 @@ import {
     createGithubCommentReporter,
     postSummaryComment as postSummaryCommentCore,
 } from 'hub-mason-core/adapters/github/comment-reporter';
+import { renderSummary } from 'hub-mason-core/adapters/github/renderer';
+import { addCommentToIssue } from 'hub-mason-core/github/issues/add-comment';
+import { withUnlockedIssue } from 'hub-mason-core/github/issues/with-lock';
 import { logger } from 'hub-mason-core/utils/logger';
 
 import { WorkflowContext } from '@/src/context/workflow-context';
@@ -121,6 +124,10 @@ export const syncStatusComment = async (
 /**
  * Posts the closing summary comment on the portal issue.
  *
+ * Handler supplied details, such as the outputs of a provisioning run, are
+ * appended to the rendered summary so the final comment reports them as
+ * readable Markdown instead of raw JSON.
+ *
  * @param lifecycle - Lifecycle of the current run.
  */
 export const postSummaryComment = async (
@@ -134,12 +141,30 @@ export const postSummaryComment = async (
         return;
     }
 
-    await postSummaryCommentCore({
+    const summaryCommentProps = {
         repository: target.repository,
         issueNumber: target.issueNumber,
         steps: lifecycle.steps,
         meta: target.meta,
         emoji: workflow.stepEmoji,
         runError: workflow.runError,
+    };
+    const details = workflow.summaryDetails;
+
+    if (!details) {
+        await postSummaryCommentCore(summaryCommentProps);
+        return;
+    }
+
+    const body = `${renderSummary(summaryCommentProps)}\n\n${details}`;
+
+    await withUnlockedIssue({
+        issueNumber: target.issueNumber,
+        repository: target.repository,
+        fn: () =>
+            addCommentToIssue(
+                { issueNumber: target.issueNumber, comment: body },
+                target.repository,
+            ),
     });
 };

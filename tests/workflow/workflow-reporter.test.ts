@@ -1,4 +1,6 @@
 import { createGithubCommentReporter } from 'hub-mason-core/adapters/github/comment-reporter';
+import { renderSummary } from 'hub-mason-core/adapters/github/renderer';
+import { addCommentToIssue } from 'hub-mason-core/github/issues/add-comment';
 import { logger } from 'hub-mason-core/utils/logger';
 
 import { WorkflowContext } from '@/src/context/workflow-context';
@@ -29,6 +31,20 @@ vi.mock('hub-mason-core/adapters/github/comment-reporter', () => ({
         onTransition: onTransitionMock,
     })),
     postSummaryComment: postSummaryMock,
+}));
+
+vi.mock('hub-mason-core/adapters/github/renderer', () => ({
+    renderSummary: vi.fn(() => 'SUMMARY BODY'),
+}));
+
+vi.mock('hub-mason-core/github/issues/add-comment', () => ({
+    addCommentToIssue: vi.fn(),
+}));
+
+vi.mock('hub-mason-core/github/issues/with-lock', () => ({
+    withUnlockedIssue: vi.fn((input: { fn: () => Promise<unknown> }) =>
+        input.fn(),
+    ),
 }));
 
 const createManager = () => {
@@ -247,6 +263,29 @@ describe('workflow-reporter', () => {
             expect(logger.warn).toHaveBeenCalledWith(
                 'Skipping comment reporting: the dispatch is not verified yet',
             );
+        });
+
+        it('should append the handler supplied details to the summary comment', async () => {
+            const manager = createManager();
+
+            WorkflowContext.getInstance().setSummaryDetails(
+                '- **Repository:** acme/identity-service',
+            );
+
+            await postSummaryComment(manager);
+
+            expect(renderSummary).toHaveBeenCalledWith(
+                expect.objectContaining({ steps: manager.steps }),
+            );
+            expect(addCommentToIssue).toHaveBeenCalledWith(
+                {
+                    issueNumber: 7,
+                    comment:
+                        'SUMMARY BODY\n\n- **Repository:** acme/identity-service',
+                },
+                { owner: 'acme', repo: 'hub-mason-portal' },
+            );
+            expect(postSummaryMock).not.toHaveBeenCalled();
         });
     });
 });
