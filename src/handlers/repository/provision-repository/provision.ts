@@ -5,6 +5,7 @@ import { ValidationError } from 'hub-mason-core/lifecycle/core/errors';
 import { logger } from 'hub-mason-core/utils/logger';
 
 import { createIaCDriver } from '@/src/iac/factory';
+import { toRedactedError } from '@/src/utils/redact-secrets';
 import { parseRepositoryOutputs } from './outputs';
 
 import { IaCProviderDriver, type IaCDriver } from '@/src/iac/types';
@@ -35,7 +36,9 @@ const createDriver = (): IaCDriver =>
 /**
  * Runs stack work that must not leave credential-bearing artifacts behind:
  * local state can hold provider credentials, so any failure removes the
- * generated files before rethrowing.
+ * generated files before rethrowing. Cleanup itself is best-effort here so
+ * a removal failure never masks the original stack failure; the success
+ * path still surfaces cleanup failures because `driver.cleanup()` throws.
  *
  * @param driver - Driver bound to the repo-synthesizer stack.
  * @param run - Stack work to attempt.
@@ -48,7 +51,14 @@ const runWithCleanupOnFailure = async <T>(
     try {
         return await run();
     } catch (error) {
-        await driver.cleanup();
+        try {
+            await driver.cleanup();
+        } catch (cleanupError) {
+            logger.error(
+                { err: toRedactedError(cleanupError) },
+                'Failed to clean IaC artifacts after failure',
+            );
+        }
 
         throw error;
     }

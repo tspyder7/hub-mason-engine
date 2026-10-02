@@ -6,7 +6,7 @@ import { ValidationError } from 'hub-mason-core/lifecycle/core/errors';
 import { logger } from 'hub-mason-core/utils/logger';
 
 import { IaCError } from '../types';
-import { redactSecrets } from '../../utils/redact-secrets';
+import { redactSecrets, toRedactedError } from '../../utils/redact-secrets';
 import {
     MAX_BUFFER,
     OPENTOFU_BINARY,
@@ -86,16 +86,18 @@ export const createOpenTofuDriver = (
                 },
                 (error, stdout, stderr) => {
                     if (error) {
-                        // Tofu prints remote URLs that can embed the token
-                        // (`https://<token>@...`); the detail also reaches the
-                        // portal comment via runError, so redact before use.
+                        const extraSecrets = token ? [token] : [];
                         const detail = redactSecrets(
                             stderr.trim() === ''
                                 ? error.message
                                 : stderr.trim(),
+                            extraSecrets,
                         );
 
-                        logger.error({ err: error }, `tofu ${args[0]} failed`);
+                        logger.error(
+                            { err: toRedactedError(error, extraSecrets) },
+                            `tofu ${args[0]} failed`,
+                        );
 
                         reject(
                             new OpenTofuError(
@@ -167,6 +169,8 @@ export const createOpenTofuDriver = (
     };
 
     const cleanup = async (): Promise<void> => {
+        const failed: string[] = [];
+
         for (const file of artifacts) {
             try {
                 await unlink(file);
@@ -179,12 +183,20 @@ export const createOpenTofuDriver = (
                 if (missing) {
                     logger.debug(`${path.basename(file)} was not present`);
                 } else {
+                    failed.push(file);
+
                     logger.error(
-                        { err: error },
+                        { err: toRedactedError(error) },
                         `Failed to remove ${path.basename(file)}`,
                     );
                 }
             }
+        }
+
+        if (failed.length > 0) {
+            throw new OpenTofuError(
+                `Failed to remove ${failed.map((file) => path.basename(file)).join(', ')}`,
+            );
         }
     };
 

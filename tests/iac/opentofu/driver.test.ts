@@ -312,7 +312,7 @@ describe('createOpenTofuDriver', () => {
             expect(logger.error).not.toHaveBeenCalled();
         });
 
-        it('should log and continue when an artifact cannot be removed', async () => {
+        it('should attempt all artifacts then throw when removal fails', async () => {
             const driver = createDriver();
 
             vi.mocked(unlink)
@@ -323,9 +323,18 @@ describe('createOpenTofuDriver', () => {
                 )
                 .mockResolvedValue(undefined);
 
-            await expect(driver.cleanup()).resolves.toBeUndefined();
+            const error = await driver.cleanup().catch((err: unknown) => err);
+
+            expect(error).toBeInstanceOf(OpenTofuError);
+            expect((error as Error).message).toContain(
+                'Failed to remove terraform.tfstate',
+            );
             expect(logger.error).toHaveBeenCalledWith(
-                { err: expect.any(Error) },
+                {
+                    err: expect.objectContaining({
+                        message: expect.any(String),
+                    }),
+                },
                 'Failed to remove terraform.tfstate',
             );
             expect(vi.mocked(unlink)).toHaveBeenCalledTimes(4);

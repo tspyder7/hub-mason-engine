@@ -72,6 +72,8 @@ jobs:
       # STEP_6: Setup OpenTofu
       - name: Setup OpenTofu
         uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: 1.13.1
 
       - name: Verify OpenTofu
         run: tofu version

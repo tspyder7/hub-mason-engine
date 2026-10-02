@@ -2,7 +2,7 @@ import { ValidationError } from 'hub-mason-core/lifecycle/core/errors';
 import { logger } from 'hub-mason-core/utils/logger';
 import { RequestError } from 'octokit';
 
-import { toLoggableError } from './redact-secrets';
+import { toRedactedError } from './redact-secrets';
 
 /**
  * Converts a GitHub 404 into a lifecycle `ValidationError` so a missing
@@ -14,9 +14,7 @@ import { toLoggableError } from './redact-secrets';
  */
 export const asNotFound = (subject: string, error: unknown): never => {
     if (error instanceof RequestError && error.status === 404) {
-        // Never log the raw error: its request headers carry the app token
-        // and pino serializes every enumerable property.
-        logger.error({ err: toLoggableError(error) }, `${subject} not found`);
+        logger.error({ err: toRedactedError(error) }, `${subject} not found`);
 
         throw new ValidationError(`${subject} not found`);
     }

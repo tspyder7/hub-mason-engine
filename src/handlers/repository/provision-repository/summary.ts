@@ -1,6 +1,44 @@
 import type { RepositoryOutputs, RepositoryPlan } from './type';
 
 /**
+ * Collapses newlines so user-controlled values cannot inject extra Markdown
+ * blocks into the summary comment.
+ *
+ * @param value - Raw interpolated value.
+ * @returns Single-line value.
+ */
+const toInline = (value: string): string => value.replace(/\r\n|\r|\n/g, ' ');
+
+/**
+ * Escapes Markdown link syntax in user-controlled values: `]`, `(`, `)`
+ * and `\` would otherwise break the repository link or inject Markdown.
+ *
+ * @param value - Raw interpolated value.
+ * @returns Escaped single-line value.
+ */
+const escapeMarkdown = (value: string): string =>
+    toInline(value).replace(/([\\[\]()])/g, '\\$1');
+
+/**
+ * Builds a safe repository URL: each path segment is encoded so `)`, `(`,
+ * spaces or newlines cannot break the surrounding Markdown link.
+ * `encodeURIComponent` leaves `(` and `)` untouched, so encode them
+ * explicitly.
+ *
+ * @param repository - `owner/name` value from the plan.
+ * @returns Absolute GitHub URL.
+ */
+const toRepositoryUrl = (repository: string): string =>
+    `https://github.com/${toInline(repository)
+        .split('/')
+        .map((part) =>
+            encodeURIComponent(part)
+                .replace(/\(/g, '%28')
+                .replace(/\)/g, '%29'),
+        )
+        .join('/')}`;
+
+/**
  * Renders the provisioned repository as Markdown for the final summary
  * comment: the requested attributes next to the facts OpenTofu reported, as
  * readable fields instead of raw JSON.
@@ -13,20 +51,22 @@ export const renderProvisionSummary = (
     plan: RepositoryPlan,
     outputs: RepositoryOutputs,
 ): string => {
-    const repositoryUrl = `https://github.com/${plan.repository}`;
+    const repositoryUrl = toRepositoryUrl(plan.repository);
 
     return [
         '### Provisioned repository',
         '',
-        `- **Repository:** [${plan.repository}](${repositoryUrl})`,
-        `- **Visibility:** ${plan.visibility}`,
-        `- **Description:** ${plan.description}`,
+        `- **Repository:** [${escapeMarkdown(plan.repository)}](${repositoryUrl})`,
+        `- **Visibility:** ${escapeMarkdown(plan.visibility)}`,
+        `- **Description:** ${escapeMarkdown(plan.description)}`,
         `- **Topics:** ${
-            plan.topics.length > 0 ? plan.topics.join(', ') : 'none'
+            plan.topics.length > 0
+                ? plan.topics.map(escapeMarkdown).join(', ')
+                : 'none'
         }`,
-        `- **Default branch:** ${outputs.repoDefaultBranch}`,
-        `- **Repository ID:** ${outputs.repoId}`,
-        `- **Clone (HTTPS):** ${outputs.repoHttpCloneUrl}`,
-        `- **Clone (SSH):** ${outputs.repoSshCloneUrl}`,
+        `- **Default branch:** ${escapeMarkdown(outputs.repoDefaultBranch)}`,
+        `- **Repository ID:** ${escapeMarkdown(outputs.repoId)}`,
+        `- **Clone (HTTPS):** ${toInline(outputs.repoHttpCloneUrl)}`,
+        `- **Clone (SSH):** ${toInline(outputs.repoSshCloneUrl)}`,
     ].join('\n');
 };

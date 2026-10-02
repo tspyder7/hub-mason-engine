@@ -4,7 +4,7 @@ import { toStepError } from 'hub-mason-core/lifecycle/core/errors';
 
 import {
     redactSecrets,
-    toLoggableError,
+    toRedactedError,
     toRedactedStepError,
 } from '@/src/utils/redact-secrets';
 
@@ -75,11 +75,11 @@ describe('redactSecrets', () => {
     });
 });
 
-describe('toLoggableError', () => {
+describe('toRedactedError', () => {
     it('should drop request headers while keeping the status', () => {
         stubSecrets();
 
-        const logged = toLoggableError(authHeaderError('rate limited'));
+        const logged = toRedactedError(authHeaderError('rate limited'));
 
         expect(logged).toEqual({ message: 'rate limited', status: 500 });
         expect(JSON.stringify(logged)).not.toContain('authorization');
@@ -89,7 +89,7 @@ describe('toLoggableError', () => {
     it('should redact secrets from the message and stack', () => {
         stubSecrets();
 
-        const logged = toLoggableError(new Error(`boom ${TOKEN}`));
+        const logged = toRedactedError(new Error(`boom ${TOKEN}`));
 
         expect(logged.message).toBe('boom [REDACTED]');
         expect(logged.stack).not.toContain(TOKEN);
@@ -98,17 +98,17 @@ describe('toLoggableError', () => {
 
     it('should keep a string or numeric code', () => {
         expect(
-            toLoggableError(Object.assign(new Error('denied'), { code: 13 })),
+            toRedactedError(Object.assign(new Error('denied'), { code: 13 })),
         ).toMatchObject({ message: 'denied', code: 13 });
         expect(
-            toLoggableError(
+            toRedactedError(
                 Object.assign(new Error('denied'), { code: 'EACCES' }),
             ),
         ).toMatchObject({ message: 'denied', code: 'EACCES' });
     });
 
     it('should drop a non-primitive code', () => {
-        const logged = toLoggableError(
+        const logged = toRedactedError(
             Object.assign(new Error('odd'), { code: { nested: true } }),
         );
 
@@ -122,7 +122,7 @@ describe('toLoggableError', () => {
         const error = new Error('bare') as Error & { stack?: string };
         delete error.stack;
 
-        expect(toLoggableError(error)).toMatchObject({
+        expect(toRedactedError(error)).toMatchObject({
             message: 'bare',
             stack: 'bare',
         });
@@ -131,7 +131,7 @@ describe('toLoggableError', () => {
     it('should stringify non-error values with secrets redacted', () => {
         stubSecrets();
 
-        expect(toLoggableError(`oops ${SECRET}`)).toEqual({
+        expect(toRedactedError(`oops ${SECRET}`)).toEqual({
             message: 'oops [REDACTED]',
         });
     });

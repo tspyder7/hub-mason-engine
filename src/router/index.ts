@@ -6,7 +6,7 @@ import { WorkflowContext } from '@/src/context/workflow-context';
 import { RouterMessages } from '@/src/utils/constants';
 import { findActiveStep } from '@/src/utils/lifecycle';
 import {
-    toLoggableError,
+    toRedactedError,
     toRedactedStepError,
 } from '@/src/utils/redact-secrets';
 import {
@@ -113,7 +113,7 @@ const reportFailure = async (
     lifecycle: Lifecycle | undefined,
 ): Promise<void> => {
     logger.error(
-        { err: toLoggableError(error) },
+        { err: toRedactedError(error) },
         'Workflow request handling failed',
     );
     WorkflowContext.getInstance().setRunError(toRedactedStepError(error));
@@ -127,7 +127,7 @@ const reportFailure = async (
     if (active) {
         await lifecycle.fail(active.id, error).catch((err: unknown) => {
             logger.error(
-                { err: toLoggableError(err) },
+                { err: toRedactedError(err) },
                 'Failed to mark the active step as failed on the portal issue',
             );
         });
@@ -137,7 +137,7 @@ const reportFailure = async (
 
     await syncStatusComment(lifecycle).catch((err: unknown) => {
         logger.error(
-            { err: toLoggableError(err) },
+            { err: toRedactedError(err) },
             'Failed to report the error on the portal status comment',
         );
     });
@@ -155,7 +155,7 @@ const finalizeRun = async (lifecycle: Lifecycle | undefined): Promise<void> => {
 
     await postSummaryComment(lifecycle).catch((err: unknown) => {
         logger.error(
-            { err: toLoggableError(err) },
+            { err: toRedactedError(err) },
             `Failed to post summary comment on ${issue}`,
         );
     });
@@ -170,7 +170,7 @@ const finalizeRun = async (lifecycle: Lifecycle | undefined): Promise<void> => {
             ),
     }).catch((err: unknown) => {
         logger.error(
-            { err: toLoggableError(err) },
+            { err: toRedactedError(err) },
             `Failed to close issue ${issue}`,
         );
     });

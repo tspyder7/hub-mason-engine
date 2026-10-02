@@ -24,14 +24,27 @@ const SECRET_ENV_VARS = [
  * variables are skipped.
  *
  * @param text - Any string about to be logged or thrown.
+ * @param extraSecrets - Additional secret values to redact (e.g. the active
+ * stack token when `tokenEnvVar` is free-form and not in `SECRET_ENV_VARS`).
  * @returns The text with secret values redacted.
  */
-export const redactSecrets = (text: string): string => {
+export const redactSecrets = (
+    text: string,
+    extraSecrets: readonly (string | undefined | null)[] = [],
+): string => {
     let redacted = text;
 
     for (const name of SECRET_ENV_VARS) {
         const value = process.env[name];
 
+        if (!value) {
+            continue;
+        }
+
+        redacted = redacted.split(value).join(REDACTED);
+    }
+
+    for (const value of extraSecrets) {
         if (!value) {
             continue;
         }
@@ -48,7 +61,7 @@ export const redactSecrets = (text: string): string => {
  * with bearer tokens, and pino serializes every enumerable property —
  * so they must never be logged directly.
  */
-export type LoggableError = {
+export type RedactedError = {
     message: string;
     stack?: string;
     status?: number;
@@ -61,30 +74,34 @@ export type LoggableError = {
  * dropped; only message, stack, status and code survive.
  *
  * @param error - Whatever was caught.
+ * @param extraSecrets - Additional secret values to redact.
  * @returns Plain object safe for `logger.error({ err })` and assertions.
  */
-export const toLoggableError = (error: unknown): LoggableError => {
+export const toRedactedError = (
+    error: unknown,
+    extraSecrets: readonly (string | undefined | null)[] = [],
+): RedactedError => {
     if (error instanceof RequestError) {
         return {
-            message: redactSecrets(error.message),
+            message: redactSecrets(error.message, extraSecrets),
             status: error.status,
         };
     }
 
     if (error instanceof Error) {
-        const message = redactSecrets(error.message);
+        const message = redactSecrets(error.message, extraSecrets);
         const code: unknown = (error as { code?: unknown }).code;
 
         return {
             message,
-            stack: redactSecrets(error.stack ?? message),
+            stack: redactSecrets(error.stack ?? message, extraSecrets),
             ...(typeof code === 'string' || typeof code === 'number'
                 ? { code }
                 : {}),
         };
     }
 
-    return { message: redactSecrets(String(error)) };
+    return { message: redactSecrets(String(error), extraSecrets) };
 };
 
 /**
@@ -93,17 +110,21 @@ export const toLoggableError = (error: unknown): LoggableError => {
  * summary comments, so both get the same redaction as the logs.
  *
  * @param error - Whatever was caught.
+ * @param extraSecrets - Additional secret values to redact.
  * @returns Step error with secrets redacted.
  */
-export const toRedactedStepError = (error: unknown): StepError => {
+export const toRedactedStepError = (
+    error: unknown,
+    extraSecrets: readonly (string | undefined | null)[] = [],
+): StepError => {
     const stepError = toStepError(error);
 
     return {
         ...stepError,
-        message: redactSecrets(stepError.message),
+        message: redactSecrets(stepError.message, extraSecrets),
         stack:
             stepError.stack === undefined
                 ? undefined
-                : redactSecrets(stepError.stack),
+                : redactSecrets(stepError.stack, extraSecrets),
     };
 };
