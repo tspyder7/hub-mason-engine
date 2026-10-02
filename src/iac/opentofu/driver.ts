@@ -24,9 +24,6 @@ import {
 import type { IaCDriver, IaCRunResult, IaCVars } from '../types';
 import type { OpenTofuDriverConfig } from './types';
 
-/**
- * Raised when an OpenTofu command exits unsuccessfully.
- */
 export class OpenTofuError extends IaCError {
     constructor(message: string) {
         super(message);
@@ -35,10 +32,9 @@ export class OpenTofuError extends IaCError {
 }
 
 /**
- * Creates an OpenTofu-backed driver for any stack directory.
- *
- * The provider reads its token from the environment, so the configured token
- * is handed over under its target name; the token itself is never logged.
+ * Creates an OpenTofu-backed driver for any stack directory. The provider
+ * reads its token from the environment, so the configured token is handed over
+ * under its target name; the token itself is never logged.
  *
  * @param config - Stack directory, file names and token env var names.
  * @returns Driver running `tofu` inside the stack directory.

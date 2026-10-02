@@ -12,11 +12,9 @@ import type {
 } from '@/src/types/dispatch';
 
 /**
- * Run scoped state shared by the workflow router, workflow adapters and
- * request type handlers.
- *
- * The dispatch is only set once the handoff signature has been verified:
- * nothing may comment on, or close, a portal issue before that happens.
+ * Run scoped state shared by the router, workflow adapters and handlers. The
+ * dispatch is only set once the handoff signature has been verified: nothing
+ * may comment on, or close, a portal issue before that happens.
  */
 export class WorkflowContext {
     private static instance: WorkflowContext | undefined;

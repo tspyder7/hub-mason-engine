@@ -26,7 +26,8 @@ const repositoryOutputsSchema = z
 
 /**
  * Parses the JSON output of `tofu output -json` into the repository facts the
- * summary comment reports.
+ * summary comment reports; the schema also maps the snake_case stack outputs
+ * onto the camelCase result.
  *
  * @param raw - Raw stdout of `tofu output -json`.
  * @returns The repository outputs of the applied stack.

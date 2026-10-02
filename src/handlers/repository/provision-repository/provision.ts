@@ -36,9 +36,8 @@ const createDriver = (): IaCDriver =>
 /**
  * Runs stack work that must not leave credential-bearing artifacts behind:
  * local state can hold provider credentials, so any failure removes the
- * generated files before rethrowing. Cleanup itself is best-effort here so
- * a removal failure never masks the original stack failure; the success
- * path still surfaces cleanup failures because `driver.cleanup()` throws.
+ * generated files before rethrowing. Cleanup there is best-effort so it never
+ * masks the original stack failure; on success `driver.cleanup()` throws.
  *
  * @param driver - Driver bound to the repo-synthesizer stack.
  * @param run - Stack work to attempt.
@@ -65,16 +64,13 @@ const runWithCleanupOnFailure = async <T>(
 };
 
 /**
- * Plans the repository provisioning for a verified request.
- *
- * After `checkRepoExists` confirms the name is free, the verified request is
- * written as a JSON variable file, the stack is initialised and a saved plan
- * is produced for the apply step.
+ * Writes the verified request as a JSON variable file, then initialises the
+ * stack and produces a saved plan for the apply step. `checkRepoExists` runs
+ * first, so an occupied name fails before any IaC work starts.
  *
  * @param props - Verified request and the owner to provision under.
  * @returns The repository attributes and the saved plan to apply.
- * @throws ValidationError when the repository already exists.
- * @throws IaCError when init or plan fails.
+ * @throws ValidationError when the repository already exists, IaCError when init or plan fails.
  */
 export const planRepository = async ({
     request,
@@ -127,16 +123,13 @@ export const planRepository = async ({
 };
 
 /**
- * Provisions the repository from a previously created plan.
- *
- * The saved plan is applied first, the stack outputs are then read as JSON
- * and the local state is removed: state can hold provider credentials and
- * must not survive the run, successful or not.
+ * Applies the saved plan, reads the stack outputs as JSON, then removes local
+ * state: state can hold provider credentials and must not survive the run,
+ * successful or not.
  *
  * @param props - Plan produced by `planRepository`.
  * @returns The repository facts reported back on the portal issue.
- * @throws IaCError when apply or output fails.
- * @throws ValidationError when the outputs are not the expected JSON.
+ * @throws IaCError when apply or output fails, ValidationError when the outputs are not the expected JSON.
  */
 export const applyRepository = async ({
     plan,

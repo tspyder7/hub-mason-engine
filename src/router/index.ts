@@ -26,12 +26,12 @@ import type {
 type Lifecycle = LifecycleManager<string>;
 
 /**
- * Routes a dispatched request to its handler and owns the request lifecycle
- * outcome: the failing step is marked and reported, then the request is always
- * summarised and closed.
+ * Routes a dispatched request to its handler and owns the run outcome: the
+ * failing step is marked and reported, then the request is always summarised
+ * and closed. Failures surface through the process exit code instead of
+ * throwing.
  *
- * @throws Never. Failures are reported on the portal issue and surfaced
- * through the process exit code.
+ * @throws Never; failures are reported on the portal issue and exit code instead.
  */
 export const routeRequest = async (): Promise<void> => {
     const workflow = WorkflowContext.getInstance();

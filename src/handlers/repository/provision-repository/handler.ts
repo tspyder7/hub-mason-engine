@@ -43,15 +43,10 @@ const registerWorkflowRun = async (
 };
 
 /**
- * Runs the workflow work of a provision repository request.
- *
- * The workflow takes over the step the portal left in flight: it confirms the
- * portal issue and its status comment, records the workflow run for
- * traceability, then provisions the repository strictly in order: the
- * IaC plan is created, applied, and its outputs recorded for the final
- * summary comment. Progress is logged, while the lifecycle step itself only
- * moves between statuses. Success completes the step, failure marks it
- * failed with the error.
+ * Runs the workflow work of a provision repository request: confirm the portal
+ * issue and status comment, record the workflow run for traceability, then
+ * plan, apply and record the outputs for the final summary comment. Success
+ * completes the active step, failure marks it failed with the error.
  *
  * @param input - Verified dispatch and provisioning request.
  * @param lifecycle - Lifecycle resumed from the portal snapshot.

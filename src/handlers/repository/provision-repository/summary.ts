@@ -2,7 +2,7 @@ import type { RepositoryOutputs, RepositoryPlan } from './type';
 
 /**
  * Collapses newlines so user-controlled values cannot inject extra Markdown
- * blocks into the summary comment.
+ * blocks or list items into the summary comment.
  *
  * @param value - Raw interpolated value.
  * @returns Single-line value.
@@ -10,8 +10,9 @@ import type { RepositoryOutputs, RepositoryPlan } from './type';
 const toInline = (value: string): string => value.replace(/\r\n|\r|\n/g, ' ');
 
 /**
- * Escapes Markdown link syntax in user-controlled values: `]`, `(`, `)`
- * and `\` would otherwise break the repository link or inject Markdown.
+ * Escapes Markdown link syntax (`]`, `(`, `)`, `\`) in user-controlled values.
+ * Unescaped, these break the surrounding repository link or inject Markdown
+ * into the summary comment.
  *
  * @param value - Raw interpolated value.
  * @returns Escaped single-line value.
@@ -20,10 +21,9 @@ const escapeMarkdown = (value: string): string =>
     toInline(value).replace(/([\\[\]()])/g, '\\$1');
 
 /**
- * Builds a safe repository URL: each path segment is encoded so `)`, `(`,
- * spaces or newlines cannot break the surrounding Markdown link.
- * `encodeURIComponent` leaves `(` and `)` untouched, so encode them
- * explicitly.
+ * Builds a repository URL with each path segment percent-encoded, so `)`,
+ * spaces or newlines cannot close the Markdown link early. `encodeURIComponent`
+ * leaves `(` and `)` untouched, so they are encoded explicitly.
  *
  * @param repository - `owner/name` value from the plan.
  * @returns Absolute GitHub URL.

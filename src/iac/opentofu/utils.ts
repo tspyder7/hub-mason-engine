@@ -39,12 +39,12 @@ export const resolveTokenTarget = (config: IaCStackConfig): string =>
     config.tokenTargetEnvVar ?? DEFAULT_TOKEN_TARGET_ENV_VAR;
 
 /**
- * Resolves every artifact that may hold credentials and must not
- * outlive the run: local state, the saved plan and the variable file.
+ * Resolves every artifact that may hold credentials and must not outlive the
+ * run: local state, the saved plan and the variable file.
  *
  * @param config - Stack directory with optional file name overrides.
  * @param files - Resolved variable and plan files.
- * @returns Absolute artifact paths in removal order.
+ * @returns Absolute artifact paths.
  */
 export const resolveOpenTofuArtifacts = (
     config: IaCStackConfig,

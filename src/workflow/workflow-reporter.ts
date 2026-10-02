@@ -17,9 +17,6 @@ import type {
 } from 'hub-mason-core/lifecycle/core/types';
 import type { Repository } from 'hub-mason-core/types/repository';
 
-/**
- * Everything needed to report back on the portal issue of the current run.
- */
 export type CommentTarget = {
     repository: Repository;
     issueNumber: number;
@@ -29,12 +26,10 @@ export type CommentTarget = {
 type Lifecycle = Pick<LifecycleManager<string>, 'steps'>;
 
 /**
- * Resolves where the workflow reports back to.
- *
- * `owner`, `repo` and `runId` in the meta point at the workflow run, which is
- * what turns the portal status comment into a traceable link to this
- * execution. Returns null until the dispatch has been verified, so a request
- * can never comment on an unverified portal issue.
+ * Resolves where the workflow reports back to. `owner`, `repo` and `runId` in
+ * the meta point at the workflow run, which turns the portal status comment
+ * into a traceable link to this execution. Null until the dispatch has been
+ * verified, so a request can never comment on an unverified portal issue.
  *
  * @returns The comment target, or null when the dispatch is not verified.
  */
@@ -95,10 +90,9 @@ export const createWorkflowCommentReporter = (): Reporter<string> => ({
 });
 
 /**
- * Re-renders the portal status comment for the current lifecycle state.
- *
- * Needed after mutations that do not emit a transition on their own, such as
- * cancelling the remaining steps on failure.
+ * Re-renders the portal status comment for the current lifecycle state. Needed
+ * after mutations that emit no transition of their own, such as cancelling the
+ * remaining steps on failure.
  *
  * @param lifecycle - Lifecycle of the current run.
  */
@@ -122,11 +116,9 @@ export const syncStatusComment = async (
 };
 
 /**
- * Posts the closing summary comment on the portal issue.
- *
- * Handler supplied details, such as the outputs of a provisioning run, are
- * appended to the rendered summary so the final comment reports them as
- * readable Markdown instead of raw JSON.
+ * Posts the closing summary comment on the portal issue. Handler-supplied
+ * details, such as the outputs of a provisioning run, are appended to the
+ * rendered summary so they report as readable Markdown instead of raw JSON.
  *
  * @param lifecycle - Lifecycle of the current run.
  */

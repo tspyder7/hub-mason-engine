@@ -10,11 +10,9 @@ const DRIVERS: Record<IaCProvider, IaCDriverFactory> = {
 };
 
 /**
- * Selects the concrete IaC backend for a stack.
- *
- * Handlers call this instead of importing a tool module directly, so a future
- * backend only registers its driver in `DRIVERS` while handler code keeps
- * talking to `IaCDriver`.
+ * Selects the concrete IaC backend for a stack. Handlers call this instead of
+ * importing a tool module directly, so a future backend only registers its
+ * driver in `DRIVERS` while handler code keeps talking to `IaCDriver`.
  *
  * @param provider - Backend to instantiate.
  * @param config - Stack directory, file names and token env var names.

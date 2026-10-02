@@ -11,10 +11,9 @@ const SUPPORTED_REQUEST_TYPES: readonly RequestTypeName[] = values(RequestType);
 
 /**
  * Resolves the handler to run from the request type in the dispatch context.
- *
- * The value is only used to pick a module from this repository, never to grant
- * access, and it is restricted to the supported request types. The handler
- * still verifies the dispatch signature before it acts on the request.
+ * The value only picks a module from this repository and is restricted to the
+ * supported request types; it never grants access, and the handler still
+ * verifies the dispatch signature before acting.
  *
  * @param context - Raw JSON encoded dispatch context.
  * @returns The request type owning the handler.
