@@ -1,0 +1,17 @@
+# Required: GitHub owner (organization or user) and repository name
+github_owner = "your-github-username-or-org"
+repo_name    = "example-repository"
+
+# Optional: Repository metadata
+repo_description = "Synthesized repository managed by OpenTofu"
+repo_visibility  = "public" # "public", "private", or "internal"
+repo_topics      = ["opentofu", "automation", "governance"]
+
+# Optional: Governance and ownership
+# code_owner defaults to github_owner if left blank
+code_owner                      = ""
+required_approving_review_count = 1
+
+# Optional: Environment reviewers for staging and production
+environment_reviewer_usernames = [] # e.g. ["octocat"]
+environment_reviewer_teams     = [] # e.g. [1234567]
