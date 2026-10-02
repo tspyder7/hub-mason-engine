@@ -5,7 +5,10 @@ import { WorkflowContext } from '@/src/context/workflow-context';
 import * as provisionRepository from '@/src/handlers/repository/provision-repository/handler';
 import { handle } from '@/src/handlers/repository/provision-repository/handler';
 import { createLifecycle } from '@/src/handlers/repository/provision-repository/lifecycle';
-import { planRepository } from '@/src/handlers/repository/provision-repository/provision';
+import {
+    applyRepository,
+    planRepository,
+} from '@/src/handlers/repository/provision-repository/provision';
 import { verifyPortalIssue } from '@/src/handlers/repository/provision-repository/request-validator';
 
 import {
@@ -19,12 +22,15 @@ import {
 
 import type {
     ProvisionRepositoryWorkflowRequest,
+    RepositoryOutputs,
     RepositoryPlan,
 } from '@/src/handlers/repository/provision-repository/type';
 import type { RequestHandler } from '@/src/types/context';
 import type { WorkflowDispatch, HandlerInput } from '@/src/types/dispatch';
 
 const PROVISION_STEP = 'provision-repository';
+
+const PLAN_FILE = '/workflow/tfplan';
 
 const { onTransitionMock } = vi.hoisted(() => ({ onTransitionMock: vi.fn() }));
 
@@ -52,6 +58,7 @@ vi.mock(
 
 vi.mock('@/src/handlers/repository/provision-repository/provision', () => ({
     planRepository: vi.fn(),
+    applyRepository: vi.fn(),
 }));
 
 const plan = (overrides: Partial<RepositoryPlan> = {}): RepositoryPlan => ({
@@ -59,6 +66,18 @@ const plan = (overrides: Partial<RepositoryPlan> = {}): RepositoryPlan => ({
     visibility: 'private',
     topics: ['go', 'grpc'],
     description: 'Hosts the identity service',
+    planFile: PLAN_FILE,
+    ...overrides,
+});
+
+const outputs = (
+    overrides: Partial<RepositoryOutputs> = {},
+): RepositoryOutputs => ({
+    repoId: '42',
+    repoName: 'identity-service',
+    repoHttpCloneUrl: 'https://github.com/acme/identity-service.git',
+    repoSshCloneUrl: 'git@github.com:acme/identity-service.git',
+    repoDefaultBranch: 'main',
     ...overrides,
 });
 
@@ -90,6 +109,7 @@ describe('provision-repository handler', () => {
         createWorkflowContext();
         onTransitionMock.mockResolvedValue(undefined);
         vi.mocked(planRepository).mockResolvedValue(plan());
+        vi.mocked(applyRepository).mockResolvedValue(outputs());
         vi.mocked(verifyPortalIssue).mockResolvedValue({
             number: 7,
             title: 'Provision identity-service',
@@ -110,7 +130,7 @@ describe('provision-repository handler', () => {
         expect(Object.keys(contract).sort()).toEqual(['handle']);
     });
 
-    it('should finish the dispatched step and log the portal issue, the workflow run and the plan', async () => {
+    it('should finish the dispatched step and log the portal issue, the workflow run and the provisioned repository', async () => {
         const input = createInput();
         const lifecycle = createLifecycle(input.dispatch);
 
@@ -146,6 +166,57 @@ describe('provision-repository handler', () => {
             request: createRequest(),
             owner: WORKFLOW_OWNER,
         });
+        expect(applyRepository).toHaveBeenCalledWith({ plan: plan() });
+    });
+
+    it('should plan, then apply the plan, then record the outputs for the summary comment', async () => {
+        const order: string[] = [];
+
+        vi.mocked(planRepository).mockImplementation(async () => {
+            order.push('plan');
+
+            return plan();
+        });
+        vi.mocked(applyRepository).mockImplementation(async () => {
+            order.push('apply');
+
+            return outputs();
+        });
+
+        const input = createInput();
+        const lifecycle = createLifecycle(input.dispatch);
+
+        await handle(input, lifecycle);
+
+        expect(order).toEqual(['plan', 'apply']);
+        expect(WorkflowContext.getInstance().summaryDetails).toContain(
+            '### Provisioned repository',
+        );
+        expect(WorkflowContext.getInstance().summaryDetails).toContain(
+            'https://github.com/acme/identity-service',
+        );
+    });
+
+    it('should leave the summary details empty when the apply fails', async () => {
+        vi.mocked(applyRepository).mockRejectedValue(
+            new Error('tofu apply failed: rate limited'),
+        );
+        const input = createInput();
+        const lifecycle = createLifecycle(input.dispatch);
+
+        await expect(handle(input, lifecycle)).rejects.toThrow(
+            'tofu apply failed: rate limited',
+        );
+
+        expect(
+            lifecycle.steps.find(({ id }) => id === PROVISION_STEP),
+        ).toMatchObject({
+            status: 'failed',
+            error: expect.objectContaining({
+                message: 'tofu apply failed: rate limited',
+            }),
+        });
+        expect(WorkflowContext.getInstance().summaryDetails).toBeNull();
     });
 
     it('should skip the status comment log when the portal has none', async () => {

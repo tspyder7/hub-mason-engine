@@ -45,7 +45,7 @@ describe('app', () => {
         });
 
         expect(logger.error).toHaveBeenCalledWith(
-            { err: error },
+            { err: expect.objectContaining({ message: error.message }) },
             'Workflow run failed before the request lifecycle could start',
         );
     });

@@ -1,11 +1,14 @@
 import { closeIssue } from 'hub-mason-core/github/issues';
 import { withUnlockedIssue } from 'hub-mason-core/github/issues/with-lock';
-import { toStepError } from 'hub-mason-core/lifecycle/core/errors';
 import { logger } from 'hub-mason-core/utils/logger';
 
 import { WorkflowContext } from '@/src/context/workflow-context';
 import { RouterMessages } from '@/src/utils/constants';
 import { findActiveStep } from '@/src/utils/lifecycle';
+import {
+    toLoggableError,
+    toRedactedStepError,
+} from '@/src/utils/redact-secrets';
 import {
     postSummaryComment,
     syncStatusComment,
@@ -109,8 +112,11 @@ const reportFailure = async (
     error: unknown,
     lifecycle: Lifecycle | undefined,
 ): Promise<void> => {
-    logger.error({ err: error }, 'Workflow request handling failed');
-    WorkflowContext.getInstance().setRunError(toStepError(error));
+    logger.error(
+        { err: toLoggableError(error) },
+        'Workflow request handling failed',
+    );
+    WorkflowContext.getInstance().setRunError(toRedactedStepError(error));
 
     if (!lifecycle) {
         return;
@@ -121,7 +127,7 @@ const reportFailure = async (
     if (active) {
         await lifecycle.fail(active.id, error).catch((err: unknown) => {
             logger.error(
-                { err },
+                { err: toLoggableError(err) },
                 'Failed to mark the active step as failed on the portal issue',
             );
         });
@@ -131,7 +137,7 @@ const reportFailure = async (
 
     await syncStatusComment(lifecycle).catch((err: unknown) => {
         logger.error(
-            { err },
+            { err: toLoggableError(err) },
             'Failed to report the error on the portal status comment',
         );
     });
@@ -148,7 +154,10 @@ const finalizeRun = async (lifecycle: Lifecycle | undefined): Promise<void> => {
     const issue = `${portal.owner}/${portal.repo}#${portal.issueNumber}`;
 
     await postSummaryComment(lifecycle).catch((err: unknown) => {
-        logger.error({ err }, `Failed to post summary comment on ${issue}`);
+        logger.error(
+            { err: toLoggableError(err) },
+            `Failed to post summary comment on ${issue}`,
+        );
     });
 
     await withUnlockedIssue({
@@ -160,6 +169,9 @@ const finalizeRun = async (lifecycle: Lifecycle | undefined): Promise<void> => {
                 { owner: portal.owner, repo: portal.repo },
             ),
     }).catch((err: unknown) => {
-        logger.error({ err }, `Failed to close issue ${issue}`);
+        logger.error(
+            { err: toLoggableError(err) },
+            `Failed to close issue ${issue}`,
+        );
     });
 };
