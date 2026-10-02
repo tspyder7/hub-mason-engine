@@ -15,8 +15,10 @@ import {
 import {
     createContext,
     createWorkflowContext,
+    resetWorkflow,
     REQUEST_ID,
 } from '../fixtures/workflow-dispatch';
+import { mockProcessExit } from '../fixtures/mocks';
 
 const { validateMock, createLifecycleMock, handleMock } = vi.hoisted(() => ({
     validateMock: vi.fn(),
@@ -24,9 +26,7 @@ const { validateMock, createLifecycleMock, handleMock } = vi.hoisted(() => ({
     handleMock: vi.fn(),
 }));
 
-const processExitSpy = vi
-    .spyOn(process, 'exit')
-    .mockImplementation((() => {}) as never);
+const processExitSpy = mockProcessExit();
 
 vi.mock(
     '@/src/handlers/repository/provision-repository/request-validator',
@@ -52,11 +52,9 @@ vi.mock('hub-mason-core/github/issues', () => ({
     closeIssue: vi.fn(),
 }));
 
-vi.mock('hub-mason-core/github/issues/with-lock', () => ({
-    withUnlockedIssue: vi.fn((input: { fn: () => Promise<unknown> }) =>
-        input.fn(),
-    ),
-}));
+vi.mock('hub-mason-core/github/issues/with-lock', async () =>
+    (await import('../fixtures/mocks')).withUnlockedIssueMockModule(),
+);
 
 const createManager = (
     statuses: string[] = ['completed', 'completed', 'in-progress'],
@@ -76,10 +74,7 @@ const createManager = (
 
 describe('router', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        WorkflowContext.reset();
-        vi.unstubAllEnvs();
-        createWorkflowContext();
+        resetWorkflow();
 
         vi.mocked(postSummaryComment).mockResolvedValue(undefined);
         vi.mocked(syncStatusComment).mockResolvedValue(undefined);

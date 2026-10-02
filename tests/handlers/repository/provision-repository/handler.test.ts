@@ -13,33 +13,28 @@ import { verifyPortalIssue } from '@/src/handlers/repository/provision-repositor
 
 import {
     createContext,
-    createWorkflowContext,
+    createDispatch,
     createRequest,
+    resetWorkflow,
     WORKFLOW_OWNER,
     RUN_ID,
     RUN_URL,
 } from '../../../fixtures/workflow-dispatch';
+import {
+    createOutputs,
+    createPlan,
+} from '../../../fixtures/provision-repository';
+import { onTransitionMock } from '../../../fixtures/mocks';
 
-import type {
-    ProvisionRepositoryWorkflowRequest,
-    RepositoryOutputs,
-    RepositoryPlan,
-} from '@/src/handlers/repository/provision-repository/type';
+import type { ProvisionRepositoryWorkflowRequest } from '@/src/handlers/repository/provision-repository/type';
 import type { RequestHandler } from '@/src/types/context';
 import type { WorkflowDispatch, HandlerInput } from '@/src/types/dispatch';
 
 const PROVISION_STEP = 'provision-repository';
 
-const PLAN_FILE = '/workflow/tfplan';
-
-const { onTransitionMock } = vi.hoisted(() => ({ onTransitionMock: vi.fn() }));
-
-vi.mock('hub-mason-core/adapters/github/comment-reporter', () => ({
-    createGithubCommentReporter: vi.fn(() => ({
-        onTransition: onTransitionMock,
-    })),
-    postSummaryComment: vi.fn(),
-}));
+vi.mock('hub-mason-core/adapters/github/comment-reporter', async () =>
+    (await import('../../../fixtures/mocks')).commentReporterMockModule(),
+);
 
 vi.mock(
     '@/src/handlers/repository/provision-repository/request-validator',
@@ -61,34 +56,9 @@ vi.mock('@/src/handlers/repository/provision-repository/provision', () => ({
     applyRepository: vi.fn(),
 }));
 
-const plan = (overrides: Partial<RepositoryPlan> = {}): RepositoryPlan => ({
-    repository: `${WORKFLOW_OWNER}/identity-service`,
-    visibility: 'private',
-    topics: ['go', 'grpc'],
-    description: 'Hosts the identity service',
-    planFile: PLAN_FILE,
-    ...overrides,
-});
-
-const outputs = (
-    overrides: Partial<RepositoryOutputs> = {},
-): RepositoryOutputs => ({
-    repoId: '42',
-    repoName: 'identity-service',
-    repoHttpCloneUrl: 'https://github.com/acme/identity-service.git',
-    repoSshCloneUrl: 'git@github.com:acme/identity-service.git',
-    repoDefaultBranch: 'main',
-    ...overrides,
-});
-
 const createInput = (
     request: ProvisionRepositoryWorkflowRequest = createRequest(),
-): HandlerInput => {
-    const dispatch = createContext();
-    WorkflowContext.getInstance().setDispatch(dispatch);
-
-    return { dispatch, request };
-};
+): HandlerInput => ({ dispatch: createDispatch(), request });
 
 const completedSnapshot = (dispatch: WorkflowDispatch): WorkflowDispatch => ({
     ...dispatch,
@@ -104,12 +74,10 @@ const completedSnapshot = (dispatch: WorkflowDispatch): WorkflowDispatch => ({
 
 describe('provision-repository handler', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        WorkflowContext.reset();
-        createWorkflowContext();
+        resetWorkflow();
         onTransitionMock.mockResolvedValue(undefined);
-        vi.mocked(planRepository).mockResolvedValue(plan());
-        vi.mocked(applyRepository).mockResolvedValue(outputs());
+        vi.mocked(planRepository).mockResolvedValue(createPlan());
+        vi.mocked(applyRepository).mockResolvedValue(createOutputs());
         vi.mocked(verifyPortalIssue).mockResolvedValue({
             number: 7,
             title: 'Provision identity-service',
@@ -166,7 +134,9 @@ describe('provision-repository handler', () => {
             request: createRequest(),
             owner: WORKFLOW_OWNER,
         });
-        expect(applyRepository).toHaveBeenCalledWith({ plan: plan() });
+        expect(applyRepository).toHaveBeenCalledWith({
+            plan: createPlan(),
+        });
     });
 
     it('should plan, then apply the plan, then record the outputs for the summary comment', async () => {
@@ -175,12 +145,12 @@ describe('provision-repository handler', () => {
         vi.mocked(planRepository).mockImplementation(async () => {
             order.push('plan');
 
-            return plan();
+            return createPlan();
         });
         vi.mocked(applyRepository).mockImplementation(async () => {
             order.push('apply');
 
-            return outputs();
+            return createOutputs();
         });
 
         const input = createInput();

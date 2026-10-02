@@ -158,3 +158,25 @@ export const createWorkflowContext = (
 
     return WorkflowContext.getInstance();
 };
+
+/**
+ * Builds a fresh dispatch and verifies it on the workflow context.
+ */
+export const createDispatch = (): WorkflowDispatch => {
+    const dispatch = createContext();
+
+    WorkflowContext.getInstance().setDispatch(dispatch);
+
+    return dispatch;
+};
+
+/**
+ * Clears mocks, drops the previous run state and boots a fresh workflow
+ * context: the standard beforeEach of every workflow facing suite.
+ */
+export const resetWorkflow = (): void => {
+    vi.clearAllMocks();
+    WorkflowContext.reset();
+    vi.unstubAllEnvs();
+    createWorkflowContext();
+};

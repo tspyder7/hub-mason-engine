@@ -13,11 +13,12 @@ import {
     createRequest,
     WORKFLOW_OWNER,
 } from '../../../fixtures/workflow-dispatch';
+import {
+    createOutputs,
+    createPlan,
+    PLAN_FILE,
+} from '../../../fixtures/provision-repository';
 
-import type {
-    RepositoryOutputs,
-    RepositoryPlan,
-} from '@/src/handlers/repository/provision-repository/type';
 import type { IaCDriver } from '@/src/iac/types';
 
 vi.mock('hub-mason-core/github/repository', () => ({
@@ -27,8 +28,6 @@ vi.mock('hub-mason-core/github/repository', () => ({
 vi.mock('@/src/iac/factory', () => ({
     createIaCDriver: vi.fn(),
 }));
-
-const PLAN_FILE = '/workflow/tfplan';
 
 const OUTPUTS_JSON = JSON.stringify({
     repo_id: { value: 42 },
@@ -45,26 +44,6 @@ const OUTPUTS_JSON = JSON.stringify({
 const calls: string[] = [];
 
 let driver: IaCDriver;
-
-const plan = (overrides: Partial<RepositoryPlan> = {}): RepositoryPlan => ({
-    repository: 'acme/identity-service',
-    visibility: 'private',
-    topics: ['go', 'grpc'],
-    description: 'Hosts the identity service',
-    planFile: PLAN_FILE,
-    ...overrides,
-});
-
-const outputs = (
-    overrides: Partial<RepositoryOutputs> = {},
-): RepositoryOutputs => ({
-    repoId: '42',
-    repoName: 'identity-service',
-    repoHttpCloneUrl: 'https://github.com/acme/identity-service.git',
-    repoSshCloneUrl: 'git@github.com:acme/identity-service.git',
-    repoDefaultBranch: 'main',
-    ...overrides,
-});
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -205,11 +184,11 @@ describe('planRepository', () => {
 
 describe('applyRepository', () => {
     it('should apply the saved plan, read the outputs and delete the state', async () => {
-        const result = await applyRepository({ plan: plan() });
+        const result = await applyRepository({ plan: createPlan() });
 
         expect(driver.apply).toHaveBeenCalledWith(PLAN_FILE);
         expect(driver.output).toHaveBeenCalledTimes(1);
-        expect(result).toEqual(outputs());
+        expect(result).toEqual(createOutputs());
         expect(driver.cleanup).toHaveBeenCalledTimes(1);
         expect(logger.info).toHaveBeenCalledWith(
             'Provisioning acme/identity-service from /workflow/tfplan',
@@ -224,7 +203,7 @@ describe('applyRepository', () => {
             new Error('tofu apply failed: rate limited'),
         );
 
-        await expect(applyRepository({ plan: plan() })).rejects.toThrow(
+        await expect(applyRepository({ plan: createPlan() })).rejects.toThrow(
             'tofu apply failed: rate limited',
         );
         expect(driver.output).not.toHaveBeenCalled();
@@ -234,10 +213,10 @@ describe('applyRepository', () => {
     it('should delete the state and rethrow when the outputs are unusable', async () => {
         vi.mocked(driver.output).mockResolvedValue('not json');
 
-        await expect(applyRepository({ plan: plan() })).rejects.toThrow(
+        await expect(applyRepository({ plan: createPlan() })).rejects.toThrow(
             ValidationError,
         );
-        await expect(applyRepository({ plan: plan() })).rejects.toThrow(
+        await expect(applyRepository({ plan: createPlan() })).rejects.toThrow(
             'Invalid OpenTofu output JSON',
         );
         expect(driver.cleanup).toHaveBeenCalledTimes(2);

@@ -1,30 +1,13 @@
 import { renderProvisionSummary } from '@/src/handlers/repository/provision-repository/summary';
 
-import type {
-    RepositoryOutputs,
-    RepositoryPlan,
-} from '@/src/handlers/repository/provision-repository/type';
-
-const plan = (overrides: Partial<RepositoryPlan> = {}): RepositoryPlan => ({
-    repository: 'acme/identity-service',
-    visibility: 'private',
-    topics: ['go', 'grpc'],
-    description: 'Hosts the identity service',
-    planFile: '/workflow/tfplan',
-    ...overrides,
-});
-
-const outputs: RepositoryOutputs = {
-    repoId: '42',
-    repoName: 'identity-service',
-    repoHttpCloneUrl: 'https://github.com/acme/identity-service.git',
-    repoSshCloneUrl: 'git@github.com:acme/identity-service.git',
-    repoDefaultBranch: 'main',
-};
+import {
+    createOutputs,
+    createPlan,
+} from '../../../fixtures/provision-repository';
 
 describe('renderProvisionSummary', () => {
     it('should render the plan and the outputs as readable Markdown', () => {
-        const body = renderProvisionSummary(plan(), outputs);
+        const body = renderProvisionSummary(createPlan(), createOutputs());
 
         expect(body).toContain('### Provisioned repository');
         expect(body).toContain(
@@ -45,7 +28,10 @@ describe('renderProvisionSummary', () => {
     });
 
     it('should report empty topics as none', () => {
-        const body = renderProvisionSummary(plan({ topics: [] }), outputs);
+        const body = renderProvisionSummary(
+            createPlan({ topics: [] }),
+            createOutputs(),
+        );
 
         expect(body).toContain('- **Topics:** none');
     });

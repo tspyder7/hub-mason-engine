@@ -14,24 +14,18 @@ import {
 
 import {
     createContext,
-    createWorkflowContext,
+    createDispatch,
+    resetWorkflow,
     WORKFLOW_OWNER,
     WORKFLOW_REPO,
     REQUEST_ID,
     RUN_ID,
 } from '../fixtures/workflow-dispatch';
+import { onTransitionMock, postSummaryMock } from '../fixtures/mocks';
 
-const { onTransitionMock, postSummaryMock } = vi.hoisted(() => ({
-    onTransitionMock: vi.fn(),
-    postSummaryMock: vi.fn(),
-}));
-
-vi.mock('hub-mason-core/adapters/github/comment-reporter', () => ({
-    createGithubCommentReporter: vi.fn(() => ({
-        onTransition: onTransitionMock,
-    })),
-    postSummaryComment: postSummaryMock,
-}));
+vi.mock('hub-mason-core/adapters/github/comment-reporter', async () =>
+    (await import('../fixtures/mocks')).commentReporterMockModule(),
+);
 
 vi.mock('hub-mason-core/adapters/github/renderer', () => ({
     renderSummary: vi.fn(() => 'SUMMARY BODY'),
@@ -41,25 +35,15 @@ vi.mock('hub-mason-core/github/issues/add-comment', () => ({
     addCommentToIssue: vi.fn(),
 }));
 
-vi.mock('hub-mason-core/github/issues/with-lock', () => ({
-    withUnlockedIssue: vi.fn((input: { fn: () => Promise<unknown> }) =>
-        input.fn(),
-    ),
-}));
+vi.mock('hub-mason-core/github/issues/with-lock', async () =>
+    (await import('../fixtures/mocks')).withUnlockedIssueMockModule(),
+);
 
-const createManager = () => {
-    const dispatch = createContext();
-    WorkflowContext.getInstance().setDispatch(dispatch);
-
-    return createLifecycle(dispatch);
-};
+const createManager = () => createLifecycle(createDispatch());
 
 describe('workflow-reporter', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        WorkflowContext.reset();
-        vi.unstubAllEnvs();
-        createWorkflowContext();
+        resetWorkflow();
         onTransitionMock.mockResolvedValue(undefined);
         postSummaryMock.mockResolvedValue(undefined);
     });
