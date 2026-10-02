@@ -59,7 +59,9 @@ The `provision-repository` handler (`src/handlers/repository/provision-repositor
 | `topics: string[]`   | `repo_topics`      | list of topics/tags                     |
 | workflow `owner`     | `github_owner`     | provider owner + `code_owner` fallback  |
 
-`planRepository` (`src/handlers/repository/provision-repository/provision.ts`) currently derives the plan from the request and only checks existence via `checkRepoExists`. Wiring `tofu plan -var-file=<request> -out=tfplan` here is the open TODO: generate a `.tfvars.json` from the validated request and run plan/apply against this root.
+The provisioning workflow drives this stack: after confirming the requested name is free, it writes the request as a JSON variable file, runs `tofu init` and `tofu plan`, then applies the saved plan. Apply runs `tofu apply`, reads `tofu output -json`, and deletes the state, plan and variable files — the same cleanup runs when any step fails, because local state can hold provider credentials and must not outlive the run.
+
+The GitHub token reaches the `tofu` child processes as `GITHUB_TOKEN`. Provider plugins are cached in `~/.terraform.d/plugin-cache` (`TF_PLUGIN_CACHE_DIR`) across runs.
 
 ## Prerequisites
 
