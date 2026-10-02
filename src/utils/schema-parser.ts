@@ -4,8 +4,9 @@ import { logger } from 'hub-mason-core/utils/logger';
 import { z } from 'zod';
 
 /**
- * Parses a value with a schema and converts failures into the lifecycle
- * `ValidationError` so every rejected input fails the request the same way.
+ * Parses a value with a schema and converts failures into `ValidationError` so
+ * every rejected input fails the request the same way. The issue message is
+ * prefixed with `subject` for context.
  *
  * @param schema - Zod schema describing the expected shape.
  * @param value - Untrusted value coming from the dispatch inputs.

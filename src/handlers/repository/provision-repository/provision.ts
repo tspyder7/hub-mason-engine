@@ -1,26 +1,76 @@
+import { fileURLToPath } from 'node:url';
+
 import { checkRepoExists } from 'hub-mason-core/github/repository';
 import { ValidationError } from 'hub-mason-core/lifecycle/core/errors';
 import { logger } from 'hub-mason-core/utils/logger';
 
+import { createIaCDriver } from '@/src/iac/factory';
+import { toRedactedError } from '@/src/utils/redact-secrets';
+import { parseRepositoryOutputs } from './outputs';
+
+import { IaCProviderDriver, type IaCDriver } from '@/src/iac/types';
 import type {
+    ApplyRepositoryProps,
     PlanRepositoryProps,
+    RepositoryOutputs,
     RepositoryPlan,
     RepositoryVisibility,
 } from './type';
 
+const MODULE_DIR = fileURLToPath(
+    new URL('../../../../infra/github/repo-synthesizer', import.meta.url),
+);
+
+const VARS_FILE_NAME = 'provision-request.tfvars.json';
+const PLAN_FILE_NAME = 'tfplan';
+export const REPO_SYNTHESIZER_TOKEN_ENV_VAR = 'HUB_MASON_TOP_SECRET_TOKEN';
+
+const createDriver = (): IaCDriver =>
+    createIaCDriver(IaCProviderDriver.OPENTOFU, {
+        moduleDir: MODULE_DIR,
+        varsFileName: VARS_FILE_NAME,
+        planFileName: PLAN_FILE_NAME,
+        tokenEnvVar: REPO_SYNTHESIZER_TOKEN_ENV_VAR,
+    });
+
 /**
- * Plans the repository provisioning for a verified request.
+ * Runs stack work that must not leave credential-bearing artifacts behind:
+ * local state can hold provider credentials, so any failure removes the
+ * generated files before rethrowing. Cleanup there is best-effort so it never
+ * masks the original stack failure; on success `driver.cleanup()` throws.
  *
- * The OpenTofu module that owns repository creation does not exist yet, so the
- * plan is limited to the repository attributes derived from the request.
- *
- * TODO(hub-mason): invoke `tofu plan` here, for example
- * `tofu plan -var-file=<request> -out=tfplan`, and derive the plan result from
- * the plan output instead of from the request.
+ * @param driver - Driver bound to the repo-synthesizer stack.
+ * @param run - Stack work to attempt.
+ * @returns Whatever the stack work produced.
+ */
+const runWithCleanupOnFailure = async <T>(
+    driver: IaCDriver,
+    run: () => Promise<T>,
+): Promise<T> => {
+    try {
+        return await run();
+    } catch (error) {
+        try {
+            await driver.cleanup();
+        } catch (cleanupError) {
+            logger.error(
+                { err: toRedactedError(cleanupError) },
+                'Failed to clean IaC artifacts after failure',
+            );
+        }
+
+        throw error;
+    }
+};
+
+/**
+ * Writes the verified request as a JSON variable file, then initialises the
+ * stack and produces a saved plan for the apply step. `checkRepoExists` runs
+ * first, so an occupied name fails before any IaC work starts.
  *
  * @param props - Verified request and the owner to provision under.
- * @returns The repository attributes the workflow intends to provision.
- * @throws ValidationError when the repository already exists.
+ * @returns The repository attributes and the saved plan to apply.
+ * @throws ValidationError when the repository already exists, IaCError when init or plan fails.
  */
 export const planRepository = async ({
     request,
@@ -47,10 +97,56 @@ export const planRepository = async ({
 
     logger.info(`Repository ${repository} is available for provisioning`);
 
-    return {
-        repository,
-        visibility,
-        topics,
-        description: request.description,
-    };
+    const driver = createDriver();
+
+    return runWithCleanupOnFailure(driver, async () => {
+        await driver.writeVars({
+            github_owner: owner,
+            repo_name: request.name,
+            repo_description: request.description,
+            repo_visibility: visibility,
+            repo_topics: topics,
+        });
+        await driver.init();
+        const planFile = await driver.plan();
+
+        logger.info(`IaC plan created for ${repository}`);
+
+        return {
+            repository,
+            visibility,
+            topics,
+            description: request.description,
+            planFile,
+        };
+    });
+};
+
+/**
+ * Applies the saved plan, reads the stack outputs as JSON, then removes local
+ * state: state can hold provider credentials and must not survive the run,
+ * successful or not.
+ *
+ * @param props - Plan produced by `planRepository`.
+ * @returns The repository facts reported back on the portal issue.
+ * @throws IaCError when apply or output fails, ValidationError when the outputs are not the expected JSON.
+ */
+export const applyRepository = async ({
+    plan,
+}: ApplyRepositoryProps): Promise<RepositoryOutputs> => {
+    logger.info(`Provisioning ${plan.repository} from ${plan.planFile}`);
+
+    const driver = createDriver();
+
+    return runWithCleanupOnFailure(driver, async () => {
+        await driver.apply(plan.planFile);
+        const outputs = parseRepositoryOutputs(await driver.output());
+        await driver.cleanup();
+
+        logger.info(
+            `Provisioned ${plan.repository} on branch ${outputs.repoDefaultBranch}`,
+        );
+
+        return outputs;
+    });
 };

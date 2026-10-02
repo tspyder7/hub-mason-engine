@@ -13,9 +13,9 @@ import { RequestType } from '@/src/utils/constants';
 import { mockGithubClient } from '../../../fixtures/github-client';
 import {
     createContext,
-    createWorkflowContext,
     createInputs,
     createRequest,
+    resetWorkflow,
     PORTAL,
     REQUEST_ID,
     SECRET,
@@ -40,10 +40,7 @@ const commentGetMock = vi.fn();
 
 describe('request-validator', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        vi.unstubAllEnvs();
-        WorkflowContext.reset();
-        createWorkflowContext();
+        resetWorkflow();
         mockGithubClient({
             issues: { get: issueGetMock, getComment: commentGetMock },
         });

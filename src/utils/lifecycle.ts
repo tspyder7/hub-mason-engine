@@ -3,10 +3,9 @@ import type { Step } from 'hub-mason-core/lifecycle/core/types';
 
 /**
  * Finds the step the workflow must continue: the first step that is neither in
- * the initial status nor terminal.
- *
- * Statuses always come from the dispatched lifecycle config, so the workflow
- * never assumes what "in progress" or "done" are called.
+ * the initial status nor terminal. Statuses always come from the dispatched
+ * lifecycle config, so the workflow never assumes what "in progress" or "done"
+ * are called.
  *
  * @param lifecycle - Lifecycle resumed from the portal snapshot.
  * @returns The active step, or undefined when every step is untouched or done.

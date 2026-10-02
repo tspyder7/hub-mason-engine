@@ -2,31 +2,18 @@ import { WorkflowContext } from '@/src/context/workflow-context';
 import { createLifecycle } from '@/src/handlers/repository/provision-repository/lifecycle';
 
 import {
-    createContext,
-    createWorkflowContext,
+    createDispatch,
+    resetWorkflow,
 } from '../../../fixtures/workflow-dispatch';
+import { onTransitionMock } from '../../../fixtures/mocks';
 
-const { onTransitionMock } = vi.hoisted(() => ({ onTransitionMock: vi.fn() }));
-
-vi.mock('hub-mason-core/adapters/github/comment-reporter', () => ({
-    createGithubCommentReporter: vi.fn(() => ({
-        onTransition: onTransitionMock,
-    })),
-    postSummaryComment: vi.fn(),
-}));
-
-const createDispatch = () => {
-    const dispatch = createContext();
-    WorkflowContext.getInstance().setDispatch(dispatch);
-
-    return dispatch;
-};
+vi.mock('hub-mason-core/adapters/github/comment-reporter', async () =>
+    (await import('../../../fixtures/mocks')).commentReporterMockModule(),
+);
 
 describe('provision-repository lifecycle', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        WorkflowContext.reset();
-        createWorkflowContext();
+        resetWorkflow();
         onTransitionMock.mockResolvedValue(undefined);
     });
 

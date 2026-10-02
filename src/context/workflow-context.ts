@@ -12,11 +12,9 @@ import type {
 } from '@/src/types/dispatch';
 
 /**
- * Run scoped state shared by the workflow router, workflow adapters and
- * request type handlers.
- *
- * The dispatch is only set once the handoff signature has been verified:
- * nothing may comment on, or close, a portal issue before that happens.
+ * Run scoped state shared by the router, workflow adapters and handlers. The
+ * dispatch is only set once the handoff signature has been verified: nothing
+ * may comment on, or close, a portal issue before that happens.
  */
 export class WorkflowContext {
     private static instance: WorkflowContext | undefined;
@@ -27,6 +25,7 @@ export class WorkflowContext {
     private _dispatch: WorkflowDispatch | null = null;
     private _statusCommentId: number | null = null;
     private _runError: StepError | null = null;
+    private _summaryDetails: string | null = null;
 
     private constructor() {
         this.run = getWorkflowRun();
@@ -57,6 +56,10 @@ export class WorkflowContext {
         return this._runError;
     }
 
+    get summaryDetails(): string | null {
+        return this._summaryDetails;
+    }
+
     get portal(): PortalInfo | null {
         return this._dispatch?.portal ?? null;
     }
@@ -76,5 +79,9 @@ export class WorkflowContext {
 
     setRunError(error: StepError): void {
         this._runError = error;
+    }
+
+    setSummaryDetails(details: string): void {
+        this._summaryDetails = details;
     }
 }

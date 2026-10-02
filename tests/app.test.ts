@@ -3,11 +3,10 @@ import { logger } from 'hub-mason-core/utils/logger';
 import { WorkflowContext } from '@/src/context/workflow-context';
 import { routeRequest } from '@/src/router';
 
-import { createWorkflowContext } from './fixtures/workflow-dispatch';
+import { resetWorkflow } from './fixtures/workflow-dispatch';
+import { mockProcessExit } from './fixtures/mocks';
 
-const processExitSpy = vi
-    .spyOn(process, 'exit')
-    .mockImplementation((() => {}) as never);
+const processExitSpy = mockProcessExit();
 
 vi.mock('@/src/router', () => ({
     routeRequest: vi.fn(),
@@ -16,10 +15,7 @@ vi.mock('@/src/router', () => ({
 describe('app', () => {
     beforeEach(() => {
         vi.resetModules();
-        vi.clearAllMocks();
-        WorkflowContext.reset();
-        vi.unstubAllEnvs();
-        createWorkflowContext();
+        resetWorkflow();
         vi.mocked(routeRequest).mockResolvedValue(undefined);
     });
 
@@ -45,7 +41,7 @@ describe('app', () => {
         });
 
         expect(logger.error).toHaveBeenCalledWith(
-            { err: error },
+            { err: expect.objectContaining({ message: error.message }) },
             'Workflow run failed before the request lifecycle could start',
         );
     });

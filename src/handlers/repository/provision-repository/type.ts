@@ -2,9 +2,6 @@ import type { HandlerInput } from '@/src/types/dispatch';
 
 export type RepositoryVisibility = 'public' | 'private';
 
-/**
- * Repository provisioning details as dispatched by hub-mason-portal.
- */
 export interface ProvisionRepositoryWorkflowRequest {
     name: string;
     description: string;
@@ -12,10 +9,6 @@ export interface ProvisionRepositoryWorkflowRequest {
     topics: string[];
 }
 
-/**
- * Raw issue form still dispatched by hub-mason-portal before the request
- * mapping landed.
- */
 export type IssueRequest = {
     name: string;
     description: string;
@@ -23,15 +16,20 @@ export type IssueRequest = {
     topics?: string;
 };
 
-/**
- * Repository attributes the workflow intends to provision, derived from the
- * request until the OpenTofu plan is wired in.
- */
 export type RepositoryPlan = {
     repository: string;
     visibility: RepositoryVisibility;
     topics: string[];
     description: string;
+    planFile: string;
+};
+
+export type RepositoryOutputs = {
+    repoId: string;
+    repoName: string;
+    repoHttpCloneUrl: string;
+    repoSshCloneUrl: string;
+    repoDefaultBranch: string;
 };
 
 export type ProvisionRepositoryHandlerInput = HandlerInput & {
@@ -41,6 +39,10 @@ export type ProvisionRepositoryHandlerInput = HandlerInput & {
 export type PlanRepositoryProps = {
     request: ProvisionRepositoryWorkflowRequest;
     owner: string;
+};
+
+export type ApplyRepositoryProps = {
+    plan: RepositoryPlan;
 };
 
 export type PortalIssueSummary = {

@@ -1,4 +1,6 @@
 import { createGithubCommentReporter } from 'hub-mason-core/adapters/github/comment-reporter';
+import { renderSummary } from 'hub-mason-core/adapters/github/renderer';
+import { addCommentToIssue } from 'hub-mason-core/github/issues/add-comment';
 import { logger } from 'hub-mason-core/utils/logger';
 
 import { WorkflowContext } from '@/src/context/workflow-context';
@@ -12,38 +14,36 @@ import {
 
 import {
     createContext,
-    createWorkflowContext,
+    createDispatch,
+    resetWorkflow,
     WORKFLOW_OWNER,
     WORKFLOW_REPO,
     REQUEST_ID,
     RUN_ID,
 } from '../fixtures/workflow-dispatch';
+import { onTransitionMock, postSummaryMock } from '../fixtures/mocks';
 
-const { onTransitionMock, postSummaryMock } = vi.hoisted(() => ({
-    onTransitionMock: vi.fn(),
-    postSummaryMock: vi.fn(),
+vi.mock('hub-mason-core/adapters/github/comment-reporter', async () =>
+    (await import('../fixtures/mocks')).commentReporterMockModule(),
+);
+
+vi.mock('hub-mason-core/adapters/github/renderer', () => ({
+    renderSummary: vi.fn(() => 'SUMMARY BODY'),
 }));
 
-vi.mock('hub-mason-core/adapters/github/comment-reporter', () => ({
-    createGithubCommentReporter: vi.fn(() => ({
-        onTransition: onTransitionMock,
-    })),
-    postSummaryComment: postSummaryMock,
+vi.mock('hub-mason-core/github/issues/add-comment', () => ({
+    addCommentToIssue: vi.fn(),
 }));
 
-const createManager = () => {
-    const dispatch = createContext();
-    WorkflowContext.getInstance().setDispatch(dispatch);
+vi.mock('hub-mason-core/github/issues/with-lock', async () =>
+    (await import('../fixtures/mocks')).withUnlockedIssueMockModule(),
+);
 
-    return createLifecycle(dispatch);
-};
+const createManager = () => createLifecycle(createDispatch());
 
 describe('workflow-reporter', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        WorkflowContext.reset();
-        vi.unstubAllEnvs();
-        createWorkflowContext();
+        resetWorkflow();
         onTransitionMock.mockResolvedValue(undefined);
         postSummaryMock.mockResolvedValue(undefined);
     });
@@ -247,6 +247,29 @@ describe('workflow-reporter', () => {
             expect(logger.warn).toHaveBeenCalledWith(
                 'Skipping comment reporting: the dispatch is not verified yet',
             );
+        });
+
+        it('should append the handler supplied details to the summary comment', async () => {
+            const manager = createManager();
+
+            WorkflowContext.getInstance().setSummaryDetails(
+                '- **Repository:** acme/identity-service',
+            );
+
+            await postSummaryComment(manager);
+
+            expect(renderSummary).toHaveBeenCalledWith(
+                expect.objectContaining({ steps: manager.steps }),
+            );
+            expect(addCommentToIssue).toHaveBeenCalledWith(
+                {
+                    issueNumber: 7,
+                    comment:
+                        'SUMMARY BODY\n\n- **Repository:** acme/identity-service',
+                },
+                { owner: 'acme', repo: 'hub-mason-portal' },
+            );
+            expect(postSummaryMock).not.toHaveBeenCalled();
         });
     });
 });

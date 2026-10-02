@@ -44,6 +44,7 @@ describe('workflow-context', () => {
         expect(workflow.dispatch).toBeNull();
         expect(workflow.statusCommentId).toBeNull();
         expect(workflow.runError).toBeNull();
+        expect(workflow.summaryDetails).toBeNull();
         expect(workflow.portal).toBeNull();
         expect(workflow.stepEmoji).toEqual({});
     });
@@ -62,15 +63,19 @@ describe('workflow-context', () => {
         );
     });
 
-    it('should record the status comment and the run error', () => {
+    it('should record the status comment, the run error and the summary details', () => {
         const workflow = createWorkflowContext();
 
         workflow.setDispatch(createContext());
         workflow.setStatusCommentId(99);
         workflow.setRunError({ message: 'boom' });
+        workflow.setSummaryDetails('- **Repository:** acme/identity-service');
 
         expect(workflow.statusCommentId).toBe(99);
         expect(workflow.runError).toEqual({ message: 'boom' });
+        expect(workflow.summaryDetails).toBe(
+            '- **Repository:** acme/identity-service',
+        );
     });
 
     it('should use no emoji when the snapshot has none', () => {

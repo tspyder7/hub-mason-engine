@@ -1,11 +1,14 @@
 import { closeIssue } from 'hub-mason-core/github/issues';
 import { withUnlockedIssue } from 'hub-mason-core/github/issues/with-lock';
-import { toStepError } from 'hub-mason-core/lifecycle/core/errors';
 import { logger } from 'hub-mason-core/utils/logger';
 
 import { WorkflowContext } from '@/src/context/workflow-context';
 import { RouterMessages } from '@/src/utils/constants';
 import { findActiveStep } from '@/src/utils/lifecycle';
+import {
+    toRedactedError,
+    toRedactedStepError,
+} from '@/src/utils/redact-secrets';
 import {
     postSummaryComment,
     syncStatusComment,
@@ -23,12 +26,12 @@ import type {
 type Lifecycle = LifecycleManager<string>;
 
 /**
- * Routes a dispatched request to its handler and owns the request lifecycle
- * outcome: the failing step is marked and reported, then the request is always
- * summarised and closed.
+ * Routes a dispatched request to its handler and owns the run outcome: the
+ * failing step is marked and reported, then the request is always summarised
+ * and closed. Failures surface through the process exit code instead of
+ * throwing.
  *
- * @throws Never. Failures are reported on the portal issue and surfaced
- * through the process exit code.
+ * @throws Never; failures are reported on the portal issue and exit code instead.
  */
 export const routeRequest = async (): Promise<void> => {
     const workflow = WorkflowContext.getInstance();
@@ -109,8 +112,11 @@ const reportFailure = async (
     error: unknown,
     lifecycle: Lifecycle | undefined,
 ): Promise<void> => {
-    logger.error({ err: error }, 'Workflow request handling failed');
-    WorkflowContext.getInstance().setRunError(toStepError(error));
+    logger.error(
+        { err: toRedactedError(error) },
+        'Workflow request handling failed',
+    );
+    WorkflowContext.getInstance().setRunError(toRedactedStepError(error));
 
     if (!lifecycle) {
         return;
@@ -121,7 +127,7 @@ const reportFailure = async (
     if (active) {
         await lifecycle.fail(active.id, error).catch((err: unknown) => {
             logger.error(
-                { err },
+                { err: toRedactedError(err) },
                 'Failed to mark the active step as failed on the portal issue',
             );
         });
@@ -131,7 +137,7 @@ const reportFailure = async (
 
     await syncStatusComment(lifecycle).catch((err: unknown) => {
         logger.error(
-            { err },
+            { err: toRedactedError(err) },
             'Failed to report the error on the portal status comment',
         );
     });
@@ -148,7 +154,10 @@ const finalizeRun = async (lifecycle: Lifecycle | undefined): Promise<void> => {
     const issue = `${portal.owner}/${portal.repo}#${portal.issueNumber}`;
 
     await postSummaryComment(lifecycle).catch((err: unknown) => {
-        logger.error({ err }, `Failed to post summary comment on ${issue}`);
+        logger.error(
+            { err: toRedactedError(err) },
+            `Failed to post summary comment on ${issue}`,
+        );
     });
 
     await withUnlockedIssue({
@@ -160,6 +169,9 @@ const finalizeRun = async (lifecycle: Lifecycle | undefined): Promise<void> => {
                 { owner: portal.owner, repo: portal.repo },
             ),
     }).catch((err: unknown) => {
-        logger.error({ err }, `Failed to close issue ${issue}`);
+        logger.error(
+            { err: toRedactedError(err) },
+            `Failed to close issue ${issue}`,
+        );
     });
 };

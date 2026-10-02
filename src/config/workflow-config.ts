@@ -5,9 +5,6 @@ import { WorkflowConfigMessages } from '@/src/utils/constants';
 
 import type { WorkflowInputs } from '@/src/types/dispatch';
 
-/**
- * Identity of the workflow run that is currently executing.
- */
 export type WorkflowRun = {
     runId: number;
     runUrl: string;
@@ -20,9 +17,9 @@ const DEFAULT_SERVER_URL = 'https://github.com';
 const DEFAULT_ATTEMPT = '1';
 
 /**
- * Reads the dispatch inputs from the `workflow_dispatch` event payload.
- * The portal hands the request and context over as JSON encoded input
- * strings.
+ * Reads the dispatch inputs from the `workflow_dispatch` event payload. The
+ * portal hands the request and context over as JSON encoded input strings;
+ * missing inputs fall back to empty strings.
  *
  * @returns Raw request and context inputs.
  */
@@ -37,13 +34,11 @@ export const getWorkflowInputs = (): WorkflowInputs => {
 };
 
 /**
- * Resolves the workflow run that is currently executing.
- *
- * The run identity is what makes every comment written by the workflow
- * traceable back to this workflow run.
+ * Resolves the workflow run that is currently executing. The run identity is
+ * what makes every comment written by the workflow traceable back to this run.
  *
  * @returns Run id, URL, repository and attempt number.
- * @throws When the workflow run environment is incomplete.
+ * @throws ValidationError when the workflow run environment is incomplete.
  */
 export const getWorkflowRun = (): WorkflowRun => {
     const runId = process.env['GITHUB_RUN_ID'];

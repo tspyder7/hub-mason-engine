@@ -14,6 +14,10 @@ const notFound = () =>
     });
 
 describe('asNotFound', () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
     it('should throw a validation error for a 404', () => {
         expect(() => asNotFound('Issue acme/repo#7', notFound())).toThrow(
             ValidationError,
@@ -25,6 +29,32 @@ describe('asNotFound', () => {
             expect.objectContaining({ err: expect.anything() }),
             'Issue acme/repo#7 not found',
         );
+    });
+
+    it('should never log request headers or tokens', () => {
+        const token = 'app-token-value';
+
+        vi.stubEnv('HUB_MASON_GITHUB_APP_TOKEN', token);
+
+        const error = new RequestError('Not Found', 404, {
+            request: {
+                method: 'GET',
+                url: '/repos/acme/hub-mason-portal',
+                headers: { authorization: `Bearer ${token}` },
+            },
+        });
+
+        expect(() => asNotFound('Issue acme/repo#7', error)).toThrow(
+            ValidationError,
+        );
+
+        const logged = vi
+            .mocked(logger.error)
+            .mock.calls.map(([loggedError]) => JSON.stringify(loggedError))
+            .join('');
+
+        expect(logged).not.toContain(token);
+        expect(logged).not.toContain('authorization');
     });
 
     it('should rethrow non-404 errors', () => {

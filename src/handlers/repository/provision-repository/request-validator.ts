@@ -53,16 +53,14 @@ const failWith = (message: string): never => {
 };
 
 /**
- * Validates the repository provisioning payload dispatched by the portal.
- *
- * The payload itself is not covered by the dispatch signature, so it is
- * validated against strict schemas that drop any unknown field. Both the
- * workflow contract and the legacy issue form are accepted and normalised to the
- * workflow contract.
+ * The payload is not covered by the dispatch signature, so it is validated
+ * against strict schemas that drop unknown fields. Both the workflow contract
+ * and the legacy issue form are accepted and normalised to the workflow
+ * contract.
  *
  * @param payload - Raw decoded dispatch request.
  * @returns The validated provisioning request.
- * @throws ValidationError when the payload does not match the schema.
+ * @throws ValidationError when the payload matches neither schema.
  */
 export const parseRequestPayload = (
     payload: unknown,
@@ -91,13 +89,9 @@ export const parseRequestPayload = (
 };
 
 /**
- * Reads the portal details from the raw dispatch context.
- *
- * The core context schema strips unknown keys, so the portal info has to be
- * read from the raw payload. The signature does not cover the portal info
- * itself, only the request id and issue time, so its shape is validated here
- * and any dispatch without usable portal details is rejected before the
- * workflow acts.
+ * The core context schema strips unknown keys and the signature covers only
+ * the request id and issue time, so portal details are read and shape-checked
+ * from the raw payload before the workflow acts on them.
  *
  * @param context - Raw JSON encoded dispatch context.
  * @returns The portal issue coordinates to report back to.
@@ -116,16 +110,12 @@ const readPortalInfo = (context: string): PortalInfo => {
 };
 
 /**
- * Validates the dispatched provision repository request.
- *
- * Verifies the handoff signature, its freshness and the request id
- * consistency, then validates the payload and the portal details it must
- * report back to.
+ * Verifies the handoff signature, its freshness and the request id consistency,
+ * then validates the payload and the portal details it must report back to.
  *
  * @param inputs - Raw request and context inputs of the workflow.
  * @returns The verified dispatch together with the provisioning request.
- * @throws When the signature is missing, invalid or expired, or when the
- * request does not belong to a provision repository request.
+ * @throws When the signature is missing, invalid or expired, or the request type is wrong.
  */
 export const validate = (
     inputs: WorkflowInputs,
@@ -157,11 +147,8 @@ export const validate = (
 };
 
 /**
- * Verifies that the originating portal issue and the status comment handed
- * over by the portal still exist.
- *
- * The workflow reports back exclusively through those two objects, so a missing
- * issue or comment has to fail the request before any privileged work runs.
+ * The workflow reports exclusively through the portal issue and its status
+ * comment, so a missing one fails the request before any privileged work runs.
  *
  * @param portal - Portal repository issue coordinates.
  * @returns Summary of the verified issue.

@@ -3,6 +3,7 @@ import { withUnlockedIssue } from 'hub-mason-core/github/issues/with-lock';
 import { LifecycleManager } from 'hub-mason-core/lifecycle/core/manager';
 import { ValidationError } from 'hub-mason-core/lifecycle/core/errors';
 import { logger } from 'hub-mason-core/utils/logger';
+import { RequestError } from 'octokit';
 
 import { WorkflowContext } from '@/src/context/workflow-context';
 import { routeRequest } from '@/src/router';
@@ -14,8 +15,10 @@ import {
 import {
     createContext,
     createWorkflowContext,
+    resetWorkflow,
     REQUEST_ID,
 } from '../fixtures/workflow-dispatch';
+import { mockProcessExit } from '../fixtures/mocks';
 
 const { validateMock, createLifecycleMock, handleMock } = vi.hoisted(() => ({
     validateMock: vi.fn(),
@@ -23,9 +26,7 @@ const { validateMock, createLifecycleMock, handleMock } = vi.hoisted(() => ({
     handleMock: vi.fn(),
 }));
 
-const processExitSpy = vi
-    .spyOn(process, 'exit')
-    .mockImplementation((() => {}) as never);
+const processExitSpy = mockProcessExit();
 
 vi.mock(
     '@/src/handlers/repository/provision-repository/request-validator',
@@ -51,11 +52,9 @@ vi.mock('hub-mason-core/github/issues', () => ({
     closeIssue: vi.fn(),
 }));
 
-vi.mock('hub-mason-core/github/issues/with-lock', () => ({
-    withUnlockedIssue: vi.fn((input: { fn: () => Promise<unknown> }) =>
-        input.fn(),
-    ),
-}));
+vi.mock('hub-mason-core/github/issues/with-lock', async () =>
+    (await import('../fixtures/mocks')).withUnlockedIssueMockModule(),
+);
 
 const createManager = (
     statuses: string[] = ['completed', 'completed', 'in-progress'],
@@ -75,10 +74,7 @@ const createManager = (
 
 describe('router', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
-        WorkflowContext.reset();
-        vi.unstubAllEnvs();
-        createWorkflowContext();
+        resetWorkflow();
 
         vi.mocked(postSummaryComment).mockResolvedValue(undefined);
         vi.mocked(syncStatusComment).mockResolvedValue(undefined);
@@ -173,10 +169,42 @@ describe('router', () => {
             expect.objectContaining({ message: 'invalid signature' }),
         );
         expect(logger.error).toHaveBeenCalledWith(
-            { err: error },
+            { err: expect.objectContaining({ message: 'invalid signature' }) },
             'Workflow request handling failed',
         );
         expect(processExitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('should never log secrets or post them to the portal issue', async () => {
+        const token = 'top-secret-value';
+
+        vi.stubEnv('HUB_MASON_TOP_SECRET_TOKEN', token);
+
+        const error = new RequestError(
+            `GET https://${token}@github.com failed`,
+            500,
+            {
+                request: {
+                    method: 'GET',
+                    url: 'https://api.github.com/repos/acme/x',
+                    headers: { authorization: `Bearer ${token}` },
+                },
+            },
+        );
+        handleMock.mockRejectedValue(error);
+
+        await routeRequest();
+
+        const logged = JSON.stringify(vi.mocked(logger.error).mock.calls);
+
+        expect(logged).not.toContain(token);
+        expect(logged).not.toContain('authorization');
+        expect(WorkflowContext.getInstance().runError).toMatchObject({
+            message: expect.not.stringContaining(token),
+        });
+        expect(
+            JSON.stringify(WorkflowContext.getInstance().runError),
+        ).not.toContain(token);
     });
 
     it('should fail the active step, cancel the rest and report on the portal issue', async () => {

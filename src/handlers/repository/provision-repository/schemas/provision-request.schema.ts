@@ -10,7 +10,6 @@ export const descriptionSchema = z
     .string()
     .min(1, 'Repository description is required');
 
-/** Contract the workflow provisions from: `isPublic` flag and `topics` array. */
 export const dispatchedRequestSchema = z.object({
     name: repositoryNameSchema,
     description: descriptionSchema,

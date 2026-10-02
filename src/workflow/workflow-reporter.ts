@@ -2,6 +2,9 @@ import {
     createGithubCommentReporter,
     postSummaryComment as postSummaryCommentCore,
 } from 'hub-mason-core/adapters/github/comment-reporter';
+import { renderSummary } from 'hub-mason-core/adapters/github/renderer';
+import { addCommentToIssue } from 'hub-mason-core/github/issues/add-comment';
+import { withUnlockedIssue } from 'hub-mason-core/github/issues/with-lock';
 import { logger } from 'hub-mason-core/utils/logger';
 
 import { WorkflowContext } from '@/src/context/workflow-context';
@@ -14,9 +17,6 @@ import type {
 } from 'hub-mason-core/lifecycle/core/types';
 import type { Repository } from 'hub-mason-core/types/repository';
 
-/**
- * Everything needed to report back on the portal issue of the current run.
- */
 export type CommentTarget = {
     repository: Repository;
     issueNumber: number;
@@ -26,12 +26,10 @@ export type CommentTarget = {
 type Lifecycle = Pick<LifecycleManager<string>, 'steps'>;
 
 /**
- * Resolves where the workflow reports back to.
- *
- * `owner`, `repo` and `runId` in the meta point at the workflow run, which is
- * what turns the portal status comment into a traceable link to this
- * execution. Returns null until the dispatch has been verified, so a request
- * can never comment on an unverified portal issue.
+ * Resolves where the workflow reports back to. `owner`, `repo` and `runId` in
+ * the meta point at the workflow run, which turns the portal status comment
+ * into a traceable link to this execution. Null until the dispatch has been
+ * verified, so a request can never comment on an unverified portal issue.
  *
  * @returns The comment target, or null when the dispatch is not verified.
  */
@@ -92,10 +90,9 @@ export const createWorkflowCommentReporter = (): Reporter<string> => ({
 });
 
 /**
- * Re-renders the portal status comment for the current lifecycle state.
- *
- * Needed after mutations that do not emit a transition on their own, such as
- * cancelling the remaining steps on failure.
+ * Re-renders the portal status comment for the current lifecycle state. Needed
+ * after mutations that emit no transition of their own, such as cancelling the
+ * remaining steps on failure.
  *
  * @param lifecycle - Lifecycle of the current run.
  */
@@ -119,7 +116,9 @@ export const syncStatusComment = async (
 };
 
 /**
- * Posts the closing summary comment on the portal issue.
+ * Posts the closing summary comment on the portal issue. Handler-supplied
+ * details, such as the outputs of a provisioning run, are appended to the
+ * rendered summary so they report as readable Markdown instead of raw JSON.
  *
  * @param lifecycle - Lifecycle of the current run.
  */
@@ -134,12 +133,30 @@ export const postSummaryComment = async (
         return;
     }
 
-    await postSummaryCommentCore({
+    const summaryCommentProps = {
         repository: target.repository,
         issueNumber: target.issueNumber,
         steps: lifecycle.steps,
         meta: target.meta,
         emoji: workflow.stepEmoji,
         runError: workflow.runError,
+    };
+    const details = workflow.summaryDetails;
+
+    if (!details) {
+        await postSummaryCommentCore(summaryCommentProps);
+        return;
+    }
+
+    const body = `${renderSummary(summaryCommentProps)}\n\n${details}`;
+
+    await withUnlockedIssue({
+        issueNumber: target.issueNumber,
+        repository: target.repository,
+        fn: () =>
+            addCommentToIssue(
+                { issueNumber: target.issueNumber, comment: body },
+                target.repository,
+            ),
     });
 };

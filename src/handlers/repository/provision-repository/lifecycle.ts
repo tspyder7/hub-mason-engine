@@ -5,10 +5,9 @@ import { createWorkflowCommentReporter } from '@/src/workflow/workflow-reporter'
 import type { WorkflowDispatch } from '@/src/types/dispatch';
 
 /**
- * Resumes the portal lifecycle for a provision repository request.
- *
- * The portal snapshot is the whole lifecycle: its config, definitions and
- * steps are taken over as dispatched, no workflow owned steps are added.
+ * Resumes the portal lifecycle for a provision repository request. The portal
+ * snapshot is the whole lifecycle: config, definitions and steps are taken
+ * over as dispatched, and no workflow-owned steps are added.
  *
  * @param dispatch - Verified dispatch carrying the portal snapshot.
  * @returns Lifecycle manager resumed from the portal snapshot.

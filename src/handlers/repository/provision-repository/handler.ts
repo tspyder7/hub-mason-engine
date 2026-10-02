@@ -5,8 +5,9 @@ import { WorkflowContext } from '@/src/context/workflow-context';
 import { syncStatusComment } from '@/src/workflow/workflow-reporter';
 import { findActiveStep } from '@/src/utils/lifecycle';
 import { HandlerMessages } from '@/src/utils/constants';
-import { planRepository } from './provision';
+import { applyRepository, planRepository } from './provision';
 import { parseRequestPayload, verifyPortalIssue } from './request-validator';
+import { renderProvisionSummary } from './summary';
 
 import type { LifecycleManager } from 'hub-mason-core/lifecycle/core/manager';
 import type { HandlerInput, PortalInfo } from '@/src/types/dispatch';
@@ -42,13 +43,10 @@ const registerWorkflowRun = async (
 };
 
 /**
- * Runs the workflow work of a provision repository request.
- *
- * The workflow takes over the step the portal left in flight: it confirms the
- * portal issue and its status comment, records the workflow run for
- * traceability, and then plans the repository. Progress is logged, while the
- * lifecycle step itself only moves between statuses. Success completes the
- * step, failure marks it failed with the error.
+ * Runs the workflow work of a provision repository request: confirm the portal
+ * issue and status comment, record the workflow run for traceability, then
+ * plan, apply and record the outputs for the final summary comment. Success
+ * completes the active step, failure marks it failed with the error.
  *
  * @param input - Verified dispatch and provisioning request.
  * @param lifecycle - Lifecycle resumed from the portal snapshot.
@@ -73,6 +71,13 @@ export const handle = async (
         recordDispatch(input.dispatch);
         await verifyPortalIssueStep(input.dispatch.portal);
         await registerWorkflowRun(lifecycle);
-        await planRepository({ request, owner: workflow.run.owner });
+
+        const plan = await planRepository({
+            request,
+            owner: workflow.run.owner,
+        });
+        const outputs = await applyRepository({ plan });
+
+        workflow.setSummaryDetails(renderProvisionSummary(plan, outputs));
     });
 };
