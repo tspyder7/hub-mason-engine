@@ -41,3 +41,8 @@ export const WorkflowSecretMessages = {
 export const ResolveRequestTypeMessages = {
     MISSING_CONTEXT: 'Missing context input',
 } as const;
+
+export const OpenTofuMessages = {
+    MISSING_TOKEN:
+        'Missing required environment variable: HUB_MASON_TOP_SECRET_TOKEN',
+} as const;
