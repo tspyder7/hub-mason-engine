@@ -27,6 +27,7 @@ export class WorkflowContext {
     private _dispatch: WorkflowDispatch | null = null;
     private _statusCommentId: number | null = null;
     private _runError: StepError | null = null;
+    private _summaryDetails: string | null = null;
 
     private constructor() {
         this.run = getWorkflowRun();
@@ -57,6 +58,10 @@ export class WorkflowContext {
         return this._runError;
     }
 
+    get summaryDetails(): string | null {
+        return this._summaryDetails;
+    }
+
     get portal(): PortalInfo | null {
         return this._dispatch?.portal ?? null;
     }
@@ -76,5 +81,9 @@ export class WorkflowContext {
 
     setRunError(error: StepError): void {
         this._runError = error;
+    }
+
+    setSummaryDetails(details: string): void {
+        this._summaryDetails = details;
     }
 }
