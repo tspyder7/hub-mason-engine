@@ -18,3 +18,7 @@ build/
 
 # Ignore built js files
 dist/
+
+# opentofu
+*.tf
+*.hcl
