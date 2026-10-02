@@ -60,16 +60,41 @@ jobs:
             hub-mason-portal
             hub-mason-engine
 
-      # STEP_5: Setup OpenTofu
+      # STEP_5: Owner-wide token for OpenTofu, which has to create the new repository.
+      - name: Generate top secret token
+        id: top-secret-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.HUB_MASON_BOT_ID }}
+          private-key: ${{ secrets.HUB_MASON_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      # STEP_6: Setup OpenTofu
       - name: Setup OpenTofu
         uses: opentofu/setup-opentofu@v2
 
       - name: Verify OpenTofu
         run: tofu version
 
-      # STEP_6: Provision Repository 
+      # STEP_7: Cache OpenTofu providers across runs
+      - name: Configure OpenTofu plugin cache
+        run: |
+          echo "TF_PLUGIN_CACHE_DIR=$HOME/.terraform.d/plugin-cache" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.terraform.d/plugin-cache"
+
+      - name: Cache OpenTofu providers
+        uses: actions/cache@v5
+        with:
+          path: ~/.terraform.d/plugin-cache
+          # Changes the cache anytime any provider lock file under infra changes
+          key: ${{ runner.os }}-tofu-providers-${{ hashFiles('infra/**/.terraform.lock.hcl') }}
+          restore-keys: |
+            ${{ runner.os }}-tofu-providers-
+
+      # STEP_8: Provision Repository
       - name: Provision Repository
         env:
           HUB_MASON_GITHUB_APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          HUB_MASON_TOP_SECRET_TOKEN: ${{ steps.top-secret-token.outputs.token }}
           HUB_MASON_WORKFLOW_SECRET_KEY: ${{ secrets.HUB_MASON_WORKFLOW_SECRET_KEY }}
         run: bun run src/app.ts
