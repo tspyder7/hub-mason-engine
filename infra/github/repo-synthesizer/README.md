@@ -95,18 +95,18 @@ tofu apply -var-file="terraform.tfvars"
 Minimal `terraform.tfvars`:
 
 ```hcl
-github_owner = "your-github-username-or-org"
-repo_name    = "example-repository"
+github_owner                    = "your-github-username-or-org"
+repo_name                       = "example-repository"
 
-repo_description = "Synthesized repository managed by OpenTofu"
-repo_visibility  = "public" # "public", "private", or "internal"
-repo_topics      = ["opentofu", "automation", "governance"]
+repo_description                = "Synthesized repository managed by OpenTofu"
+repo_visibility                 = "public" # "public", "private", or "internal"
+repo_topics                     = ["opentofu", "automation", "governance"]
 
 code_owner                      = "" # defaults to github_owner
 required_approving_review_count = 1
 
-environment_reviewer_usernames = [] # e.g. ["octocat"]
-environment_reviewer_teams     = [] # numeric team IDs, e.g. [1234567]
+environment_reviewer_usernames  = [] # e.g. ["octocat"]
+environment_reviewer_teams      = [] # numeric team IDs, e.g. [1234567]
 ```
 
 Generate vars from an engine request (JSON equivalent, `terraform.tfvars.json` also works):
