@@ -17,22 +17,13 @@ Creating a repository is easy; configuring it correctly per organizational stand
 
 ## Architecture
 
-```
-              ┌─────────────────────────────────────────┐
-              │            repo-synthesizer             │
-              │        (infra/repo-synthesizer)         │
-              └──────────────────┬──────────────────────┘
-                                 │
-       ┌─────────────────────────┼─────────────────────────┐
-       ▼                         ▼                         ▼
-┌────────────────────┐    ┌────────────────────┐    ┌────────────────────┐
-│    Repo Setup      │    │    Governance      │    │  Boilerplate Files │
-├────────────────────┤    ├────────────────────┤    ├────────────────────┤
-│ • Name & Scope     │    │ • Branch Rules     │    │ • README & License │
-│ • Visibility       │    │ • Required Checks  │    │ • .gitignore       │
-│ • Environments     │    │ • CODEOWNERS       │    │ • GitHub Workflows │
-│ • Secrets & Vars   │    │ • Secret Scanning  │    │ • PR Templates     │
-└────────────────────┘    └────────────────────┘    └────────────────────┘
+```mermaid
+flowchart TD
+    ROOT["repo-synthesizer<br/>(infra/repo-synthesizer)"] --> REPO["repository<br/>github_repository + default branch"]
+    REPO --> ACT["actions<br/>Actions + workflow permissions"]
+    REPO --> ENV["repository-environments<br/>staging / production / development"]
+    REPO --> FILES["repository-files<br/>README + CODEOWNERS"]
+    FILES --> RULES["repository-rulesets<br/>default-branch protection"]
 ```
 
 Composition order in `main.tf` matters and is preserved from the POC: `repository` → (`actions`, `repository_environments`, `repository_files`) → `repository_rulesets` (explicit `depends_on = [module.repository_files]`).
