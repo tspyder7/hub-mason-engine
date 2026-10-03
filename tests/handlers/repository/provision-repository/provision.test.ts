@@ -152,6 +152,7 @@ describe('planRepository', () => {
             repo_description: 'Hosts the identity service',
             repo_visibility: 'private',
             repo_topics: ['go', 'grpc'],
+            environment_reviewer_usernames: [WORKFLOW_OWNER],
         });
         expect(calls).toEqual(['vars', 'init', 'plan']);
         expect(driver.cleanup).not.toHaveBeenCalled();
