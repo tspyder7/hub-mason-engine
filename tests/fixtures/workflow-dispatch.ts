@@ -20,6 +20,7 @@ export const WORKFLOW_REPO = 'hub-mason-engine';
 export const RUN_ID = '123';
 export const RUN_URL = `https://github.com/${WORKFLOW_OWNER}/${WORKFLOW_REPO}/actions/runs/${RUN_ID}`;
 export const PORTAL_RUN_ID = 456;
+export const PORTAL_RUN_URL = `https://github.com/acme/hub-mason-portal/actions/runs/${PORTAL_RUN_ID}`;
 
 export const PORTAL: PortalInfo = {
     owner: 'acme',

@@ -9,6 +9,9 @@ import type { RepositoryOutputs, RepositoryPlan } from './type';
  */
 const toInline = (value: string): string => value.replace(/\r\n|\r|\n/g, ' ');
 
+const toInlineCode = (value: string): string =>
+    `\`${toInline(value).replace(/`/g, "'")}\``;
+
 /**
  * Escapes Markdown link syntax (`]`, `(`, `)`, `\`) in user-controlled values.
  * Unescaped, these break the surrounding repository link or inject Markdown
@@ -57,16 +60,9 @@ export const renderProvisionSummary = (
         '### Provisioned repository',
         '',
         `- **Repository:** [${escapeMarkdown(plan.repository)}](${repositoryUrl})`,
-        `- **Visibility:** ${escapeMarkdown(plan.visibility)}`,
-        `- **Description:** ${escapeMarkdown(plan.description)}`,
-        `- **Topics:** ${
-            plan.topics.length > 0
-                ? plan.topics.map(escapeMarkdown).join(', ')
-                : 'none'
-        }`,
         `- **Default branch:** ${escapeMarkdown(outputs.repoDefaultBranch)}`,
-        `- **Repository ID:** ${escapeMarkdown(outputs.repoId)}`,
+        `- **Repository ID:** ${toInlineCode(outputs.repoId)}`,
         `- **Clone (HTTPS):** ${toInline(outputs.repoHttpCloneUrl)}`,
-        `- **Clone (SSH):** ${toInline(outputs.repoSshCloneUrl)}`,
+        `- **Clone (SSH):** ${toInlineCode(outputs.repoSshCloneUrl)}`,
     ].join('\n');
 };

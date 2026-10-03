@@ -1,6 +1,9 @@
-import { createGithubCommentReporter } from 'hub-mason-core/adapters/github/comment-reporter';
-import { renderSummary } from 'hub-mason-core/adapters/github/renderer';
+import {
+    renderStatusComment,
+    renderSummary,
+} from 'hub-mason-core/adapters/github/renderer';
 import { addCommentToIssue } from 'hub-mason-core/github/issues/add-comment';
+import { updateCommentOnIssue } from 'hub-mason-core/github/issues/update-comment';
 import { logger } from 'hub-mason-core/utils/logger';
 
 import { WorkflowContext } from '@/src/context/workflow-context';
@@ -8,6 +11,7 @@ import { createLifecycle } from '@/src/handlers/repository/provision-repository/
 import {
     createWorkflowCommentReporter,
     postSummaryComment,
+    renderPortalRunLine,
     resolveCommentTarget,
     syncStatusComment,
 } from '@/src/workflow/workflow-reporter';
@@ -21,19 +25,20 @@ import {
     REQUEST_ID,
     RUN_ID,
     PORTAL_RUN_ID,
+    PORTAL_RUN_URL,
 } from '../fixtures/workflow-dispatch';
-import { onTransitionMock, postSummaryMock } from '../fixtures/mocks';
-
-vi.mock('hub-mason-core/adapters/github/comment-reporter', async () =>
-    (await import('../fixtures/mocks')).commentReporterMockModule(),
-);
 
 vi.mock('hub-mason-core/adapters/github/renderer', () => ({
+    renderStatusComment: vi.fn(() => 'STATUS BODY'),
     renderSummary: vi.fn(() => 'SUMMARY BODY'),
 }));
 
 vi.mock('hub-mason-core/github/issues/add-comment', () => ({
-    addCommentToIssue: vi.fn(),
+    addCommentToIssue: vi.fn(async () => 77),
+}));
+
+vi.mock('hub-mason-core/github/issues/update-comment', () => ({
+    updateCommentOnIssue: vi.fn(async () => undefined),
 }));
 
 vi.mock('hub-mason-core/github/issues/with-lock', async () =>
@@ -45,8 +50,12 @@ const createManager = () => createLifecycle(createDispatch());
 describe('workflow-reporter', () => {
     beforeEach(() => {
         resetWorkflow();
-        onTransitionMock.mockResolvedValue(undefined);
-        postSummaryMock.mockResolvedValue(undefined);
+        vi.mocked(addCommentToIssue).mockResolvedValue(77);
+        vi.mocked(updateCommentOnIssue).mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+        vi.clearAllMocks();
     });
 
     describe('resolveCommentTarget', () => {
@@ -116,8 +125,33 @@ describe('workflow-reporter', () => {
         });
     });
 
+    describe('renderPortalRunLine', () => {
+        it('should render the portal run link', () => {
+            WorkflowContext.getInstance().setDispatch(createContext());
+
+            expect(renderPortalRunLine()).toBe(
+                `Portal workflow run: [${PORTAL_RUN_ID}](${PORTAL_RUN_URL})`,
+            );
+        });
+
+        it('should return null when the portal run is unknown', () => {
+            const dispatch = createContext();
+
+            WorkflowContext.getInstance().setDispatch({
+                ...dispatch,
+                portal: { ...dispatch.portal, runId: null },
+            });
+
+            expect(renderPortalRunLine()).toBeNull();
+        });
+
+        it('should return null when the dispatch is not verified', () => {
+            expect(renderPortalRunLine()).toBeNull();
+        });
+    });
+
     describe('createWorkflowCommentReporter', () => {
-        it('should mirror transitions into the portal status comment', async () => {
+        it('should keep both portal and engine runs in the status comment', async () => {
             const manager = createManager();
             const step = manager.steps[0]!;
 
@@ -128,42 +162,29 @@ describe('workflow-reporter', () => {
                 all: manager.steps,
             });
 
-            expect(createGithubCommentReporter).toHaveBeenCalledWith(
+            expect(renderStatusComment).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    repository: { owner: 'acme', repo: 'hub-mason-portal' },
-                    issueNumber: 7,
+                    steps: manager.steps,
                     meta: expect.objectContaining({ runId: 123 }),
-                    emoji: expect.objectContaining({ pending: '⏳' }),
                     runError: null,
                 }),
             );
-            expect(onTransitionMock).toHaveBeenCalledWith(
-                expect.objectContaining({ step, all: manager.steps }),
+            expect(updateCommentOnIssue).toHaveBeenCalledWith(
+                {
+                    commentId: 42,
+                    comment: expect.stringContaining(
+                        `Portal workflow run: [${PORTAL_RUN_ID}](${PORTAL_RUN_URL})`,
+                    ),
+                },
+                { owner: 'acme', repo: 'hub-mason-portal' },
             );
+            expect(
+                vi.mocked(updateCommentOnIssue).mock.calls[0]![0].comment,
+            ).toContain('STATUS BODY');
+            expect(addCommentToIssue).not.toHaveBeenCalled();
         });
 
-        it('should reuse the status comment created by the portal', async () => {
-            const manager = createManager();
-
-            await createWorkflowCommentReporter().onTransition?.({
-                step: manager.steps[0]!,
-                from: 'pending',
-                to: 'pending',
-                all: manager.steps,
-            });
-
-            const input = vi.mocked(createGithubCommentReporter).mock
-                .calls[0]![0];
-
-            expect(input.getCommentId?.()).toBe(42);
-
-            input.setCommentId?.(77);
-
-            expect(WorkflowContext.getInstance().statusCommentId).toBe(77);
-            expect(input.getCommentId?.()).toBe(77);
-        });
-
-        it('should let the core reporter create a comment when the portal has none', async () => {
+        it('should create a comment when the portal has none', async () => {
             const manager = createManager();
             const dispatch = createContext();
             const workflow = WorkflowContext.getInstance();
@@ -180,10 +201,15 @@ describe('workflow-reporter', () => {
                 all: manager.steps,
             });
 
-            const input = vi.mocked(createGithubCommentReporter).mock
-                .calls[0]![0];
-
-            expect(input.getCommentId?.()).toBeUndefined();
+            expect(addCommentToIssue).toHaveBeenCalledWith(
+                {
+                    issueNumber: 7,
+                    comment: expect.stringContaining('STATUS BODY'),
+                },
+                { owner: 'acme', repo: 'hub-mason-portal' },
+            );
+            expect(workflow.statusCommentId).toBe(77);
+            expect(updateCommentOnIssue).not.toHaveBeenCalled();
         });
 
         it('should report the run error recorded by the router', async () => {
@@ -197,10 +223,34 @@ describe('workflow-reporter', () => {
                 all: manager.steps,
             });
 
-            const input = vi.mocked(createGithubCommentReporter).mock
-                .calls[0]![0];
+            expect(renderStatusComment).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    runError: { message: 'boom' },
+                }),
+            );
+        });
 
-            expect(input.runError).toEqual({ message: 'boom' });
+        it('should omit the portal line when the portal run is unknown', async () => {
+            const manager = createManager();
+            const dispatch = createContext();
+
+            WorkflowContext.getInstance().setDispatch({
+                ...dispatch,
+                portal: { ...dispatch.portal, runId: null },
+            });
+
+            await createWorkflowCommentReporter().onTransition?.({
+                step: manager.steps[0]!,
+                from: 'pending',
+                to: 'pending',
+                all: manager.steps,
+            });
+
+            const comment = vi.mocked(updateCommentOnIssue).mock.calls[0]![0]
+                .comment as string;
+
+            expect(comment).toBe('STATUS BODY');
+            expect(comment).not.toContain('Portal workflow run');
         });
 
         it('should skip reporting when the dispatch is not verified', async () => {
@@ -216,27 +266,10 @@ describe('workflow-reporter', () => {
                 all: [],
             });
 
-            expect(createGithubCommentReporter).not.toHaveBeenCalled();
-            expect(onTransitionMock).not.toHaveBeenCalled();
+            expect(renderStatusComment).not.toHaveBeenCalled();
             expect(logger.warn).toHaveBeenCalledWith(
                 'Skipping comment reporting: the dispatch is not verified yet',
             );
-        });
-
-        it('should resolve when the core reporter has no transition handler', async () => {
-            vi.mocked(createGithubCommentReporter).mockReturnValueOnce(
-                {} as never,
-            );
-            const manager = createManager();
-
-            await expect(
-                createWorkflowCommentReporter().onTransition?.({
-                    step: manager.steps[0]!,
-                    from: 'pending',
-                    to: 'pending',
-                    all: manager.steps,
-                }),
-            ).resolves.toBeUndefined();
         });
     });
 
@@ -246,20 +279,16 @@ describe('workflow-reporter', () => {
 
             await syncStatusComment(manager);
 
-            const last = manager.steps[manager.steps.length - 1]!;
-
-            expect(onTransitionMock).toHaveBeenCalledWith({
-                step: last,
-                from: last.status,
-                to: last.status,
-                all: manager.steps,
-            });
+            expect(renderStatusComment).toHaveBeenCalledWith(
+                expect.objectContaining({ steps: manager.steps }),
+            );
+            expect(updateCommentOnIssue).toHaveBeenCalled();
         });
 
         it('should skip the reporter when the lifecycle has no steps', async () => {
             await syncStatusComment({ steps: [] });
 
-            expect(onTransitionMock).not.toHaveBeenCalled();
+            expect(renderStatusComment).not.toHaveBeenCalled();
             expect(logger.warn).toHaveBeenCalledWith(
                 'Skipping status comment: the lifecycle has no steps',
             );
@@ -267,31 +296,35 @@ describe('workflow-reporter', () => {
     });
 
     describe('postSummaryComment', () => {
-        it('should post the summary of the run on the portal issue', async () => {
+        it('should post both portal and engine runs on the portal issue', async () => {
             const manager = createManager();
 
             await postSummaryComment(manager);
 
-            expect(postSummaryMock).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    repository: { owner: 'acme', repo: 'hub-mason-portal' },
+            expect(renderSummary).toHaveBeenCalledWith(
+                expect.objectContaining({ steps: manager.steps }),
+            );
+            expect(addCommentToIssue).toHaveBeenCalledWith(
+                {
                     issueNumber: 7,
-                    steps: manager.steps,
-                    runError: null,
-                }),
+                    comment: `SUMMARY BODY\n\nPortal workflow run: [${PORTAL_RUN_ID}](${PORTAL_RUN_URL})`,
+                },
+                { owner: 'acme', repo: 'hub-mason-portal' },
             );
         });
 
         it('should skip the summary when the dispatch is not verified', async () => {
+            WorkflowContext.reset();
+
             await postSummaryComment({ steps: [] });
 
-            expect(postSummaryMock).not.toHaveBeenCalled();
+            expect(renderSummary).not.toHaveBeenCalled();
             expect(logger.warn).toHaveBeenCalledWith(
                 'Skipping comment reporting: the dispatch is not verified yet',
             );
         });
 
-        it('should append the handler supplied details to the summary comment', async () => {
+        it('should append the handler supplied details after the portal run', async () => {
             const manager = createManager();
 
             WorkflowContext.getInstance().setSummaryDetails(
@@ -306,12 +339,27 @@ describe('workflow-reporter', () => {
             expect(addCommentToIssue).toHaveBeenCalledWith(
                 {
                     issueNumber: 7,
-                    comment:
-                        'SUMMARY BODY\n\n- **Repository:** acme/identity-service',
+                    comment: `SUMMARY BODY\n\nPortal workflow run: [${PORTAL_RUN_ID}](${PORTAL_RUN_URL})\n\n- **Repository:** acme/identity-service`,
                 },
                 { owner: 'acme', repo: 'hub-mason-portal' },
             );
-            expect(postSummaryMock).not.toHaveBeenCalled();
+        });
+
+        it('should omit the portal line when the portal run is unknown', async () => {
+            const manager = createManager();
+            const dispatch = createContext();
+
+            WorkflowContext.getInstance().setDispatch({
+                ...dispatch,
+                portal: { ...dispatch.portal, runId: null },
+            });
+
+            await postSummaryComment(manager);
+
+            expect(addCommentToIssue).toHaveBeenCalledWith(
+                { issueNumber: 7, comment: 'SUMMARY BODY' },
+                { owner: 'acme', repo: 'hub-mason-portal' },
+            );
         });
     });
 });
