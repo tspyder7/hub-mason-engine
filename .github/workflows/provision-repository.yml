@@ -60,14 +60,54 @@ jobs:
             hub-mason-portal
             hub-mason-engine
 
-      # STEP_5: Owner-wide token for OpenTofu, which has to create the new repository.
+      # STEP_5: Check PAT fallback without exposing secret in if expression.
+      # secrets context banned in if, so expose boolean via step output.
+      - name: Check PAT configured
+        id: pat-check
+        env:
+          AUTOMATION_PAT: ${{ secrets.HUB_MASON_AUTOMATION_PAT }}
+        run: |
+          if [ -n "$AUTOMATION_PAT" ]; then
+            echo "::add-mask::$AUTOMATION_PAT"
+            echo "pat_configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pat_configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # STEP_5a: Owner-wide token for OpenTofu, which has to create the new repository.
+      # Skipped when PAT fallback exists: POST /user/repos allows UAT/PAT only,
+      # not App installation tokens (403 Rate Limit Exceeded).
       - name: Generate top secret token
         id: top-secret-token
+        if: steps.pat-check.outputs.pat_configured != 'true'
         uses: actions/create-github-app-token@v3
         with:
           client-id: ${{ vars.HUB_MASON_BOT_ID }}
           private-key: ${{ secrets.HUB_MASON_BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
+
+      # STEP_5b: Prefer PAT when set, else App installation token.
+      # Remove HUB_MASON_AUTOMATION_PAT secret later to switch back to App-only (org).
+      - name: Resolve Automation Token
+        id: automation-token
+        env:
+          AUTOMATION_PAT: ${{ secrets.HUB_MASON_AUTOMATION_PAT }}
+          APP_TOKEN: ${{ steps.top-secret-token.outputs.token }}
+        run: |
+          if [ -n "$AUTOMATION_PAT" ]; then
+            echo "::add-mask::$AUTOMATION_PAT"
+            echo "token=$AUTOMATION_PAT" >> "$GITHUB_OUTPUT"
+            echo "source=pat" >> "$GITHUB_OUTPUT"
+            echo "Using PAT from secrets for OpenTofu provisioning"
+          elif [ -n "$APP_TOKEN" ]; then
+            echo "::add-mask::$APP_TOKEN"
+            echo "token=$APP_TOKEN" >> "$GITHUB_OUTPUT"
+            echo "source=app" >> "$GITHUB_OUTPUT"
+            echo "Using GitHub App installation token for OpenTofu provisioning"
+          else
+            echo "No automation token available (set HUB_MASON_AUTOMATION_PAT or enable App token generation)" >&2
+            exit 1
+          fi
 
       # STEP_6: Setup OpenTofu
       - name: Setup OpenTofu
@@ -97,6 +137,6 @@ jobs:
       - name: Provision Repository
         env:
           HUB_MASON_GITHUB_APP_TOKEN: ${{ steps.app-token.outputs.token }}
-          HUB_MASON_TOP_SECRET_TOKEN: ${{ steps.top-secret-token.outputs.token }}
+          HUB_MASON_TOP_SECRET_TOKEN: ${{ steps.automation-token.outputs.token }}
           HUB_MASON_WORKFLOW_SECRET_KEY: ${{ secrets.HUB_MASON_WORKFLOW_SECRET_KEY }}
         run: bun run src/app.ts
