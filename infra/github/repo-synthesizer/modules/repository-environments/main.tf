@@ -12,13 +12,21 @@ resource "github_repository_environment" "repository_environment" {
 
   prevent_self_review = each.value.prevent_self_review
 
-  reviewers {
-    users = each.value.reviewers_enabled ? local.reviewer_users : []
-    teams = each.value.reviewers_enabled ? var.reviewer_teams : []
+  dynamic "reviewers" {
+    for_each = each.value.reviewers_enabled ? [1] : []
+
+    content {
+      users = local.reviewer_users
+      teams = var.reviewer_teams
+    }
   }
 
-  deployment_branch_policy {
-    protected_branches     = each.value.protected_branches
-    custom_branch_policies = each.value.custom_branch_policies
+  dynamic "deployment_branch_policy" {
+    for_each = (each.value.protected_branches || each.value.custom_branch_policies) ? [1] : []
+
+    content {
+      protected_branches     = each.value.protected_branches
+      custom_branch_policies = each.value.custom_branch_policies
+    }
   }
 }
