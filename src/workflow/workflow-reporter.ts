@@ -26,10 +26,11 @@ export type CommentTarget = {
 type Lifecycle = Pick<LifecycleManager<string>, 'steps'>;
 
 /**
- * Resolves where the workflow reports back to. `owner`, `repo` and `runId` in
- * the meta point at the workflow run, which turns the portal status comment
- * into a traceable link to this execution. Null until the dispatch has been
- * verified, so a request can never comment on an unverified portal issue.
+ * Resolves where the workflow reports back to. `portal` and `engine` in the
+ * meta carry both workflow runs, rendering as `[portal] ---> [engine]` once
+ * delegated. Flat `owner`/`repo`/`runId` stay as the engine run for backward
+ * compatibility. Null until the dispatch has been verified, so a request can
+ * never comment on an unverified portal issue.
  *
  * @returns The comment target, or null when the dispatch is not verified.
  */
@@ -53,6 +54,18 @@ export const resolveCommentTarget = (): CommentTarget | null => {
             repo: workflow.run.repo,
             runId: workflow.run.runId,
             actor: dispatch.actor,
+            portal: portal.runId
+                ? {
+                      owner: portal.owner,
+                      repo: portal.repo,
+                      runId: portal.runId,
+                  }
+                : undefined,
+            engine: {
+                owner: workflow.run.owner,
+                repo: workflow.run.repo,
+                runId: workflow.run.runId,
+            },
         },
     };
 };
