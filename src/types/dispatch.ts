@@ -6,6 +6,7 @@ export type PortalInfo = {
     repo: string;
     issueNumber: number;
     statusCommentId: number | null;
+    runId?: number | null;
 };
 
 /**

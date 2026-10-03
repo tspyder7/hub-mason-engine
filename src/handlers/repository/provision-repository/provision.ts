@@ -106,6 +106,7 @@ export const planRepository = async ({
             repo_description: request.description,
             repo_visibility: visibility,
             repo_topics: topics,
+            environment_reviewer_usernames: [owner],
         });
         await driver.init();
         const planFile = await driver.plan();

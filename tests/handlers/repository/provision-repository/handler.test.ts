@@ -24,7 +24,6 @@ import {
     createOutputs,
     createPlan,
 } from '../../../fixtures/provision-repository';
-import { onTransitionMock } from '../../../fixtures/mocks';
 
 import type { ProvisionRepositoryWorkflowRequest } from '@/src/handlers/repository/provision-repository/type';
 import type { RequestHandler } from '@/src/types/context';
@@ -32,8 +31,21 @@ import type { WorkflowDispatch, HandlerInput } from '@/src/types/dispatch';
 
 const PROVISION_STEP = 'provision-repository';
 
-vi.mock('hub-mason-core/adapters/github/comment-reporter', async () =>
-    (await import('../../../fixtures/mocks')).commentReporterMockModule(),
+vi.mock('hub-mason-core/adapters/github/renderer', () => ({
+    renderStatusComment: vi.fn(() => 'STATUS BODY'),
+    renderSummary: vi.fn(() => 'SUMMARY BODY'),
+}));
+
+vi.mock('hub-mason-core/github/issues/add-comment', () => ({
+    addCommentToIssue: vi.fn(async () => 77),
+}));
+
+vi.mock('hub-mason-core/github/issues/update-comment', () => ({
+    updateCommentOnIssue: vi.fn(async () => undefined),
+}));
+
+vi.mock('hub-mason-core/github/issues/with-lock', async () =>
+    (await import('../../../fixtures/mocks')).withUnlockedIssueMockModule(),
 );
 
 vi.mock(
@@ -75,7 +87,6 @@ const completedSnapshot = (dispatch: WorkflowDispatch): WorkflowDispatch => ({
 describe('provision-repository handler', () => {
     beforeEach(() => {
         resetWorkflow();
-        onTransitionMock.mockResolvedValue(undefined);
         vi.mocked(planRepository).mockResolvedValue(createPlan());
         vi.mocked(applyRepository).mockResolvedValue(createOutputs());
         vi.mocked(verifyPortalIssue).mockResolvedValue({
