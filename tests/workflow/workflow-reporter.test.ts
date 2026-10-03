@@ -11,7 +11,6 @@ import { createLifecycle } from '@/src/handlers/repository/provision-repository/
 import {
     createWorkflowCommentReporter,
     postSummaryComment,
-    renderPortalRunLine,
     resolveCommentTarget,
     syncStatusComment,
 } from '@/src/workflow/workflow-reporter';
@@ -25,7 +24,6 @@ import {
     REQUEST_ID,
     RUN_ID,
     PORTAL_RUN_ID,
-    PORTAL_RUN_URL,
 } from '../fixtures/workflow-dispatch';
 
 vi.mock('hub-mason-core/adapters/github/renderer', () => ({
@@ -125,33 +123,8 @@ describe('workflow-reporter', () => {
         });
     });
 
-    describe('renderPortalRunLine', () => {
-        it('should render the portal run link', () => {
-            WorkflowContext.getInstance().setDispatch(createContext());
-
-            expect(renderPortalRunLine()).toBe(
-                `Portal workflow run: [${PORTAL_RUN_ID}](${PORTAL_RUN_URL})`,
-            );
-        });
-
-        it('should return null when the portal run is unknown', () => {
-            const dispatch = createContext();
-
-            WorkflowContext.getInstance().setDispatch({
-                ...dispatch,
-                portal: { ...dispatch.portal, runId: null },
-            });
-
-            expect(renderPortalRunLine()).toBeNull();
-        });
-
-        it('should return null when the dispatch is not verified', () => {
-            expect(renderPortalRunLine()).toBeNull();
-        });
-    });
-
     describe('createWorkflowCommentReporter', () => {
-        it('should keep both portal and engine runs in the status comment', async () => {
+        it('should render the status comment without extra portal line', async () => {
             const manager = createManager();
             const step = manager.steps[0]!;
 
@@ -172,15 +145,10 @@ describe('workflow-reporter', () => {
             expect(updateCommentOnIssue).toHaveBeenCalledWith(
                 {
                     commentId: 42,
-                    comment: expect.stringContaining(
-                        `Portal workflow run: [${PORTAL_RUN_ID}](${PORTAL_RUN_URL})`,
-                    ),
+                    comment: 'STATUS BODY',
                 },
                 { owner: 'acme', repo: 'hub-mason-portal' },
             );
-            expect(
-                vi.mocked(updateCommentOnIssue).mock.calls[0]![0].comment,
-            ).toContain('STATUS BODY');
             expect(addCommentToIssue).not.toHaveBeenCalled();
         });
 
@@ -230,29 +198,6 @@ describe('workflow-reporter', () => {
             );
         });
 
-        it('should omit the portal line when the portal run is unknown', async () => {
-            const manager = createManager();
-            const dispatch = createContext();
-
-            WorkflowContext.getInstance().setDispatch({
-                ...dispatch,
-                portal: { ...dispatch.portal, runId: null },
-            });
-
-            await createWorkflowCommentReporter().onTransition?.({
-                step: manager.steps[0]!,
-                from: 'pending',
-                to: 'pending',
-                all: manager.steps,
-            });
-
-            const comment = vi.mocked(updateCommentOnIssue).mock.calls[0]![0]
-                .comment as string;
-
-            expect(comment).toBe('STATUS BODY');
-            expect(comment).not.toContain('Portal workflow run');
-        });
-
         it('should skip reporting when the dispatch is not verified', async () => {
             await createWorkflowCommentReporter().onTransition?.({
                 step: {
@@ -296,7 +241,7 @@ describe('workflow-reporter', () => {
     });
 
     describe('postSummaryComment', () => {
-        it('should post both portal and engine runs on the portal issue', async () => {
+        it('should post the summary on the portal issue', async () => {
             const manager = createManager();
 
             await postSummaryComment(manager);
@@ -307,7 +252,7 @@ describe('workflow-reporter', () => {
             expect(addCommentToIssue).toHaveBeenCalledWith(
                 {
                     issueNumber: 7,
-                    comment: `SUMMARY BODY\n\nPortal workflow run: [${PORTAL_RUN_ID}](${PORTAL_RUN_URL})`,
+                    comment: 'SUMMARY BODY',
                 },
                 { owner: 'acme', repo: 'hub-mason-portal' },
             );
@@ -324,7 +269,7 @@ describe('workflow-reporter', () => {
             );
         });
 
-        it('should append the handler supplied details after the portal run', async () => {
+        it('should append the handler supplied details after the summary', async () => {
             const manager = createManager();
 
             WorkflowContext.getInstance().setSummaryDetails(
@@ -339,25 +284,9 @@ describe('workflow-reporter', () => {
             expect(addCommentToIssue).toHaveBeenCalledWith(
                 {
                     issueNumber: 7,
-                    comment: `SUMMARY BODY\n\nPortal workflow run: [${PORTAL_RUN_ID}](${PORTAL_RUN_URL})\n\n- **Repository:** acme/identity-service`,
+                    comment:
+                        'SUMMARY BODY\n\n- **Repository:** acme/identity-service',
                 },
-                { owner: 'acme', repo: 'hub-mason-portal' },
-            );
-        });
-
-        it('should omit the portal line when the portal run is unknown', async () => {
-            const manager = createManager();
-            const dispatch = createContext();
-
-            WorkflowContext.getInstance().setDispatch({
-                ...dispatch,
-                portal: { ...dispatch.portal, runId: null },
-            });
-
-            await postSummaryComment(manager);
-
-            expect(addCommentToIssue).toHaveBeenCalledWith(
-                { issueNumber: 7, comment: 'SUMMARY BODY' },
                 { owner: 'acme', repo: 'hub-mason-portal' },
             );
         });
