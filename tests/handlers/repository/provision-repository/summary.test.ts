@@ -13,26 +13,33 @@ describe('renderProvisionSummary', () => {
         expect(body).toContain(
             '- **Repository:** [acme/identity-service](https://github.com/acme/identity-service)',
         );
-        expect(body).toContain('- **Visibility:** private');
-        expect(body).toContain('- **Description:** Hosts the identity service');
-        expect(body).toContain('- **Topics:** go, grpc');
+        expect(body).not.toContain('Visibility');
+        expect(body).not.toContain('Description');
+        expect(body).not.toContain('Topics');
         expect(body).toContain('- **Default branch:** main');
-        expect(body).toContain('- **Repository ID:** 42');
+        expect(body).toContain('- **Repository ID:** `42`');
         expect(body).toContain(
             '- **Clone (HTTPS):** https://github.com/acme/identity-service.git',
         );
         expect(body).toContain(
-            '- **Clone (SSH):** git@github.com:acme/identity-service.git',
+            '- **Clone (SSH):** `git@github.com:acme/identity-service.git`',
         );
         expect(body).not.toContain('{');
     });
 
-    it('should report empty topics as none', () => {
+    it('should sanitize code blocks in the repository id and the ssh url', () => {
         const body = renderProvisionSummary(
-            createPlan({ topics: [] }),
-            createOutputs(),
+            createPlan(),
+            createOutputs({
+                repoId: '4`2',
+                repoSshCloneUrl: 'git@github.com:acme/a`b.git',
+            }),
         );
 
-        expect(body).toContain('- **Topics:** none');
+        expect(body).toContain("- **Repository ID:** `4'2`");
+        expect(body).toContain(
+            "- **Clone (SSH):** `git@github.com:acme/a'b.git`",
+        );
+        expect(body).not.toContain('`2`');
     });
 });

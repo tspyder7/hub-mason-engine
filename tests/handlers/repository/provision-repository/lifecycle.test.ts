@@ -5,16 +5,27 @@ import {
     createDispatch,
     resetWorkflow,
 } from '../../../fixtures/workflow-dispatch';
-import { onTransitionMock } from '../../../fixtures/mocks';
 
-vi.mock('hub-mason-core/adapters/github/comment-reporter', async () =>
-    (await import('../../../fixtures/mocks')).commentReporterMockModule(),
+vi.mock('hub-mason-core/adapters/github/renderer', () => ({
+    renderStatusComment: vi.fn(() => 'STATUS BODY'),
+    renderSummary: vi.fn(() => 'SUMMARY BODY'),
+}));
+
+vi.mock('hub-mason-core/github/issues/add-comment', () => ({
+    addCommentToIssue: vi.fn(async () => 77),
+}));
+
+vi.mock('hub-mason-core/github/issues/update-comment', () => ({
+    updateCommentOnIssue: vi.fn(async () => undefined),
+}));
+
+vi.mock('hub-mason-core/github/issues/with-lock', async () =>
+    (await import('../../../fixtures/mocks')).withUnlockedIssueMockModule(),
 );
 
 describe('provision-repository lifecycle', () => {
     beforeEach(() => {
         resetWorkflow();
-        onTransitionMock.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -48,7 +59,10 @@ describe('provision-repository lifecycle', () => {
 
         await lifecycle.transition('provision-repository', 'completed');
 
-        expect(onTransitionMock).toHaveBeenCalled();
+        const { updateCommentOnIssue } =
+            await import('hub-mason-core/github/issues/update-comment');
+
+        expect(updateCommentOnIssue).toHaveBeenCalled();
     });
 
     it('should run the step the portal left in flight to completion', async () => {
