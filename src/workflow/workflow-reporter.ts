@@ -53,6 +53,18 @@ export const resolveCommentTarget = (): CommentTarget | null => {
             repo: workflow.run.repo,
             runId: workflow.run.runId,
             actor: dispatch.actor,
+            portal: portal.runId
+                ? {
+                      owner: portal.owner,
+                      repo: portal.repo,
+                      runId: portal.runId,
+                  }
+                : undefined,
+            engine: {
+                owner: workflow.run.owner,
+                repo: workflow.run.repo,
+                runId: workflow.run.runId,
+            },
         },
     };
 };

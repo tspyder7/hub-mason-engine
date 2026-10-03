@@ -75,6 +75,47 @@ describe('workflow-reporter', () => {
                     repo: WORKFLOW_REPO,
                     runId: Number(RUN_ID),
                     actor: 'hub-mason-bot',
+                    portal: {
+                        owner: 'acme',
+                        repo: 'hub-mason-portal',
+                        runId: PORTAL_RUN_ID,
+                    },
+                    engine: {
+                        owner: WORKFLOW_OWNER,
+                        repo: WORKFLOW_REPO,
+                        runId: Number(RUN_ID),
+                    },
+                },
+            });
+        });
+
+        it('should omit portal when the dispatch carries no portal run', () => {
+            const dispatch = createContext();
+
+            WorkflowContext.getInstance().setDispatch({
+                ...dispatch,
+                portal: { ...dispatch.portal, runId: null },
+            });
+
+            expect(resolveCommentTarget()).toEqual({
+                repository: {
+                    owner: 'acme',
+                    repo: 'hub-mason-portal',
+                },
+                issueNumber: 7,
+                meta: {
+                    requestId: REQUEST_ID,
+                    requestType: 'repository/provision-repository',
+                    owner: WORKFLOW_OWNER,
+                    repo: WORKFLOW_REPO,
+                    runId: Number(RUN_ID),
+                    actor: 'hub-mason-bot',
+                    portal: undefined,
+                    engine: {
+                        owner: WORKFLOW_OWNER,
+                        repo: WORKFLOW_REPO,
+                        runId: Number(RUN_ID),
+                    },
                 },
             });
         });
