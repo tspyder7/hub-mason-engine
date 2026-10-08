@@ -1,8 +1,8 @@
 locals {
   labels = [
     {
-      name        = "app"
-      description = "Application code changes"
+      name        = "app:${lower(var.repository_name)}"
+      description = "Related to ${lower(var.repository_name)}"
       color       = "1d76db"
     },
     {
