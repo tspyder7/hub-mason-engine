@@ -23,10 +23,11 @@ flowchart TD
     REPO --> ACT["actions<br/>Actions + workflow permissions"]
     REPO --> ENV["repository-environments<br/>staging / production / development"]
     REPO --> FILES["repository-files<br/>README + CODEOWNERS"]
+    REPO --> LABELS["issues/labels<br/>authoritative issue labels"]
     FILES --> RULES["repository-rulesets<br/>default-branch protection"]
 ```
 
-Composition order in `main.tf` matters and is preserved from the POC: `repository` → (`actions`, `repository_environments`, `repository_files`) → `repository_rulesets` (explicit `depends_on = [module.repository_files]`).
+Composition order in `main.tf` matters and is preserved from the POC: `repository` → (`actions`, `repository_environments`, `repository_files`, `issue_labels`) → `repository_rulesets` (explicit `depends_on = [module.repository_files]`).
 
 ## Layout
 
@@ -44,7 +45,8 @@ infra/repo-synthesizer/
     ├── actions/                 # Actions + workflow permissions (see README)
     ├── repository-environments/ # staging / production / development (see README)
     ├── repository-files/        # README.md + CODEOWNERS bootstrap (see README)
-    └── repository-rulesets/     # default-branch protection ruleset (see README)
+    ├── repository-rulesets/     # default-branch protection ruleset (see README)
+    └── issues/labels/           # authoritative issue labels (see README)
 ```
 
 ## Relationship to hub-mason-engine

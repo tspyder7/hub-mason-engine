@@ -42,3 +42,11 @@ module "repository_rulesets" {
 
   depends_on = [module.repository_files]
 }
+
+module "issue_labels" {
+  source = "./modules/issues/labels"
+
+  repository_name = module.repository.repo_name
+
+  depends_on = [module.repository]
+}
